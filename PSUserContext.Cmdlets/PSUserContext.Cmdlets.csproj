@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net48;netstandard2.0</TargetFrameworks>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<RootNamespace>PSUserContext.Cmdlets</RootNamespace>
+		<AssemblyName>PSUserContext.Cmdlets</AssemblyName>
+	</PropertyGroup>
+
+	<!-- Reference to your internal API project -->
+	<ItemGroup>
+		<ProjectReference Include="..\PSUserContext.Api\PSUserContext.Api.csproj" />
+	</ItemGroup>
+
+	<!-- Add explicit reference to the PowerShell automation assembly -->
+	<ItemGroup>
+		<Reference Include="System.Management.Automation">
+			<!-- Path for Windows PowerShell 5.1 / .NET Framework -->
+			<HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\WindowsPowerShell\3.0\System.Management.Automation.dll</HintPath>
+			<Private>true</Private>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+		<PackageReference Include="System.Security.Principal.Windows" Version="5.0.0">
+			<PrivateAssets>true</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1">
+			<PrivateAssets>true</PrivateAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+		<!-- No need to reference System.Security.Principal.Windows explicitly -->
+		<Reference Include="System.Management.Automation">
+			<!-- Path for Windows PowerShell 5.1 / .NET Framework -->
+			<HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\WindowsPowerShell\3.0\System.Management.Automation.dll</HintPath>
+			<Private>true</Private>
+		</Reference>
+	</ItemGroup>
+
+</Project>
