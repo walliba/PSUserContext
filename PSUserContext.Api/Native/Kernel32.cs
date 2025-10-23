@@ -24,6 +24,9 @@ namespace PSUserContext.Api.Native
 		public static extern bool CloseHandle(IntPtr hObject);
 
 		[DllImport(DllName)]
+		public static extern uint WTSGetActiveConsoleSessionId();
+
+		[DllImport(DllName)]
 		public static extern SafeProcessHandle GetCurrentProcess();
 
 		[DllImport(DllName, SetLastError = true)]

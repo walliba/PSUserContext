@@ -1,22 +1,15 @@
-﻿using Microsoft.Win32.SafeHandles;
-using PSUserContext.Api.Helpers;
+﻿using PSUserContext.Api.Helpers;
 using PSUserContext.Api.Native;
-using PSUserContext.Cmdlets;
 using System;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
 using System.Management.Automation;
-using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using static PSUserContext.Api.Native.Advapi32;
 using static PSUserContext.Api.Native.InteropTypes;
 using static PSUserContext.Api.Services.ProcessExtensions;
 
-namespace PSUserContext.Cmdlet
+namespace PSUserContext.Cmdlets
 {
 	public class Win32Exception : System.ComponentModel.Win32Exception
 	{
@@ -47,7 +40,7 @@ namespace PSUserContext.Cmdlet
 		[Parameter(Position = 1, ParameterSetName = DefaultSet)]
 		[Parameter(Position = 1, ParameterSetName = RedirectedSet)]
 		[Parameter(Position = 1, ParameterSetName = VisibleSet)]
-		public uint SessionId { get; set; } = 1;
+		public uint SessionId { get; set; } = Wtsapi32.INVALID_SESSION_ID;
 
 		// This parameter belongs only to the Redirected parameter set.
 		// Attempting to specify -RedirectOutput together with -ShowWindow will result in a parameter binding error.
@@ -119,7 +112,9 @@ namespace PSUserContext.Cmdlet
 			if (!RedirectOutput)
 				dwCreationFlags |= CREATE_NEW_CONSOLE;
 
-			var primaryToken = GetSessionUserToken(false);
+			SafeNativeHandle primaryToken;
+
+			primaryToken = GetSessionUserToken(SessionId, false);
 
 			if (primaryToken == null || primaryToken.IsInvalid)
 			{

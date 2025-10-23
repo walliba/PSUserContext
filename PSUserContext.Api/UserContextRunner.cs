@@ -6,7 +6,7 @@ namespace PSUserContext.Api
 {
 	public class UserContextRunner
 	{
-
+		// Todo: abstract implementation
 		public void RunScriptInUserContext(string script, int? sessionId, bool captureOutput)
 		{
 			// 1. Enumerate sessions via WTSEnumerateSessions

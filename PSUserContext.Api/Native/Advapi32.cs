@@ -16,7 +16,6 @@ namespace PSUserContext.Api.Native
 		public const int STARTF_USESHOWWINDOW = 0x00000001;
 		public const int CREATE_NO_WINDOW = 0x08000000;
 		public const int CREATE_NEW_CONSOLE = 0x00000010;
-		public const uint INVALID_SESSION_ID = 0xFFFFFFFF;
 		public const int HANDLE_FLAG_INHERIT = 0x00000001;
 		public const int STARTF_USESTDHANDLES = 0x00000100;
 		public const int CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
@@ -55,9 +54,9 @@ namespace PSUserContext.Api.Native
 
 		[DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 		public static extern bool LookupPrivilegeName(
-			string lpSystemName,
+			string? lpSystemName,
 			ref LUID lpLuid,
-			StringBuilder lpName,
+			StringBuilder? lpName,
 			ref uint cchName);
 
 		[DllImport("advapi32.dll", SetLastError = true)]

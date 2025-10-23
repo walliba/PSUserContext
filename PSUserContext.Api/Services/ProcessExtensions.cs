@@ -14,7 +14,7 @@ namespace PSUserContext.Api.Services
 {
 	public class Win32Exception : System.ComponentModel.Win32Exception
 	{
-		private string _msg;
+		private readonly string _msg;
 		public Win32Exception(string message) : this(Marshal.GetLastWin32Error(), message) { }
 		public Win32Exception(int errorCode, string message) : base(errorCode)
 		{
@@ -26,117 +26,57 @@ namespace PSUserContext.Api.Services
 
 	public static class ProcessExtensions
 	{
-		public static bool Readable(SafeNativeHandle streamHandle)
-		{
-			byte[] aPeekBuffer = new byte[1];
-			uint aPeekedBytes = 0;
-			uint aAvailBytes = 0;
-			uint aLeftBytes = 0;
-
-			bool aPeekedSuccess = Kernel32.PeekNamedPipe(
-				streamHandle,
-				aPeekBuffer,
-				1,
-				ref aPeekedBytes, 
-				ref aAvailBytes, 
-				ref aLeftBytes);
-
-			if (aPeekedSuccess && aPeekBuffer[0] != 0)
-				return true;
-			else
-				return false;
-		}
-
 		public static SafeNativeHandle DuplicateTokenAsPrimary(SafeHandle hToken)
 		{
-			SafeNativeHandle pDupToken;
-			if (!DuplicateTokenEx(hToken, 0, IntPtr.Zero, InteropTypes.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, InteropTypes.TOKEN_TYPE.TokenPrimary, out pDupToken))
-			{
+			if (!DuplicateTokenEx(hToken, 0, IntPtr.Zero, InteropTypes.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, InteropTypes.TOKEN_TYPE.TokenPrimary, out SafeNativeHandle pDupToken))
 				throw new Win32Exception("Failed to duplicate impersonation token as primary");
-			}
 
 			return pDupToken;
 		}
 
-		//public static SafeNativeHandle GetSessionUserToken(uint sessionId, bool elevated = false)
-		//{
-		//	SafeNativeHandle hSessionUserToken;
-
-		//	if (!Wtsapi32.WTSQueryUserToken(sessionId, out hSessionUserToken))
-		//		throw new Win32Exception(Marshal.GetLastWin32Error(), $"Failed to query user token for session {sessionId}");
-
-		//	return hSessionUserToken!;
-		//}
-
-		public static SafeNativeHandle GetSessionUserToken(bool elevated = false)
+		public static SafeNativeHandle GetSessionUserToken(uint sessionId, bool elevated = false)
 		{
-			var activeSessionId = INVALID_SESSION_ID;
-			//var pSessionInfo = IntPtr.Zero;
-			var sessionCount = 0;
+			if (sessionId == INVALID_SESSION_ID)
+				sessionId = WTSExtensions.GetActiveConsoleSessionId()
+					?? throw new InvalidOperationException("No active console session found. This typically occurs when no user is logged in.");
 
-			if (Wtsapi32.WTSEnumerateSessions(WTS_CURRENT_SERVER_HANDLE, 0, 1, out var pSessionInfo, out sessionCount))
+			if (!WTSQueryUserToken(sessionId, out SafeNativeHandle hSessionUserToken))
 			{
-				var elemSz = Marshal.SizeOf<WTS_SESSION_INFO>();
-				var current = pSessionInfo.DangerousGetHandle();
+				int error = Marshal.GetLastWin32Error();
 
-				for (var i = 0; i < sessionCount; i++)
-				{
-					var si = Marshal.PtrToStructure<WTS_SESSION_INFO>(current);
+				if (error == 0x2)
+					throw new InvalidOperationException($"The session ID {sessionId} does not exist");
 
-					current = IntPtr.Add(current, elemSz);
-
-					if (si.State == WTS_CONNECTSTATE_CLASS.Active)
-					{
-						activeSessionId = si.SessionId;
-						break;
-					}
-				}
+				throw new Win32Exception(Marshal.GetLastWin32Error(), $"Failed to query user token for session {sessionId}");
 			}
 
-			pSessionInfo.Dispose();
-
-			if (activeSessionId == INVALID_SESSION_ID)
-			{
-				Console.WriteLine("Invalid session ID, getting active...");
-				activeSessionId = Wtsapi32.WTSGetActiveConsoleSessionId();
-			}
-
-			if (!WTSQueryUserToken(activeSessionId, out SafeNativeHandle hImpersonationToken)) 
-			{
-				throw new Win32Exception("WTSQueryUserToken failed to get access token");
-			}
-
-			using (hImpersonationToken)
+			using (hSessionUserToken)
 			{
 				// First see if the token is the full token or not. If it is a limited token we need to get the
 				// linked (full/elevated token) and use that for the CreateProcess task. If it is already the full or
 				// default token then we already have the best token possible.
-				InteropTypes.TokenElevationType elevationType = GetTokenElevationType(hImpersonationToken);
+				InteropTypes.TokenElevationType elevationType = GetTokenElevationType(hSessionUserToken);
 				if (elevationType == InteropTypes.TokenElevationType.TokenElevationTypeLimited && elevated == true)
 				{
-					using (var linkedToken = GetTokenLinkedToken(hImpersonationToken))
-						return DuplicateTokenAsPrimary(linkedToken);
+					using var linkedToken = GetTokenLinkedToken(hSessionUserToken);
+					return DuplicateTokenAsPrimary(linkedToken);
 				}
 				else
 				{
-					return DuplicateTokenAsPrimary(hImpersonationToken);
+					return DuplicateTokenAsPrimary(hSessionUserToken);
 				}
 			}
 		}
 
 		private static InteropTypes.TokenElevationType GetTokenElevationType(SafeHandle hToken)
 		{
-			using (SafeHGlobalBuffer tokenInfo = GetTokenInformation(hToken, 18))
-			{
-				return (InteropTypes.TokenElevationType)Marshal.ReadInt32(tokenInfo.DangerousGetHandle());
-			}
+			using SafeHGlobalBuffer tokenInfo = GetTokenInformation(hToken, 18);
+			return (InteropTypes.TokenElevationType)Marshal.ReadInt32(tokenInfo.DangerousGetHandle());
 		}
 		private static SafeNativeHandle GetTokenLinkedToken(SafeHandle hToken)
 		{
 			using (SafeHGlobalBuffer tokenInfo = GetTokenInformation(hToken, 19))
-			{
 				return new SafeNativeHandle(Marshal.ReadIntPtr(tokenInfo.DangerousGetHandle()));
-			}
 		}
 
 		private static SafeHGlobalBuffer GetTokenInformation(SafeHandle hToken, uint infoClass)

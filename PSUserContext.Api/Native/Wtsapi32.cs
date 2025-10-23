@@ -13,6 +13,7 @@ namespace PSUserContext.Api.Native
 
 		private const string DllName = "wtsapi32.dll";
 
+		public const uint INVALID_SESSION_ID = 0xFFFFFFFF;
 		public static readonly IntPtr WTS_CURRENT_SERVER_HANDLE = IntPtr.Zero;
 
 		public enum WTS_CONNECTSTATE_CLASS
@@ -65,16 +66,12 @@ namespace PSUserContext.Api.Native
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public struct WTS_SESSION_INFO
+		public readonly struct WTS_SESSION_INFO
 		{
 			public readonly uint SessionId;
-			[MarshalAs(UnmanagedType.LPWStr)]
-			public readonly string pWinStationName;
+			[MarshalAs(UnmanagedType.LPWStr)] public readonly string pWinStationName;
 			public readonly WTS_CONNECTSTATE_CLASS State;
 		}
-
-		[DllImport(DllName)]
-		public static extern uint WTSGetActiveConsoleSessionId();
 
 		[DllImport(DllName, CharSet = CharSet.Unicode, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
