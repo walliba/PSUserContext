@@ -11,16 +11,6 @@ namespace PSUserContext.Api.Native
 {
 	public static class Advapi32
 	{
-		#region Win32 Constants
-		public const int CREATE_UNICODE_ENVIRONMENT = 0x00000400;
-		public const int STARTF_USESHOWWINDOW = 0x00000001;
-		public const int CREATE_NO_WINDOW = 0x08000000;
-		public const int CREATE_NEW_CONSOLE = 0x00000010;
-		public const int HANDLE_FLAG_INHERIT = 0x00000001;
-		public const int STARTF_USESTDHANDLES = 0x00000100;
-		public const int CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
-		#endregion
-
 		[DllImport("advapi32.dll", SetLastError = true)]
 		public static extern bool DuplicateTokenEx(
 			SafeHandle ExistingTokenHandle,
@@ -38,7 +28,7 @@ namespace PSUserContext.Api.Native
 			IntPtr lpProcessAttributes,
 			IntPtr lpThreadAttributes,
 			[MarshalAs(UnmanagedType.Bool)] bool bInheritHandles,
-			uint dwCreationFlags,
+			ProcessCreationFlags dwCreationFlags,
 			SafeHandle lpEnvironment,
 			string lpCurrentDirectory,
 			ref STARTUPINFO lpStartupInfo,

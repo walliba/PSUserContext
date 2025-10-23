@@ -41,8 +41,8 @@ namespace PSUserContext.Api.Native
 		[return: MarshalAs(UnmanagedType.Bool)]
 		public static extern bool SetHandleInformation(
 			SafeHandle hObject,
-			uint dwMask,
-			uint dwFlags);
+			HandleFlags dwMask,
+			HandleFlags dwFlags);
 
 		[DllImport(DllName, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]

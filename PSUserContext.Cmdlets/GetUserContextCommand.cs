@@ -5,33 +5,32 @@ using static PSUserContext.Api.Native.Wtsapi32;
 
 namespace PSUserContext.Cmdlets
 {
-	[Cmdlet(VerbsCommon.Get, "UserSessions")]
+	[Cmdlet(VerbsCommon.Get, "UserContext")]
 	[OutputType(typeof(UserSessionInfo))]
-	public sealed class GetUserSessionsCommand : PSCmdlet
+	public sealed class GetUserContextCommand : PSCmdlet
 	{
 		protected override void ProcessRecord()
 		{
 
-			var sessions = WTSExtensions.GetSessions();
+			var sessions = SessionExtensions.GetSessions();
 
-			foreach (var native in sessions)
+			foreach (var s in sessions)
 			{
 				// Skip listening sessions
-				if (native.State == WTS_CONNECTSTATE_CLASS.Listen)
+				if (s.State == Wtsapi32.SessionState.Listen)
 					continue;
-				string userName = Wtsapi32.GetSessionString(native.SessionId, WTS_INFO_CLASS.WTSUserName) ?? string.Empty;
-				string domainName = Wtsapi32.GetSessionString(native.SessionId, WTS_INFO_CLASS.WTSDomainName) ?? string.Empty;
 
 				// Skip sessions with no user
-				if (string.IsNullOrEmpty(userName) && string.IsNullOrEmpty(domainName))
+				if (string.IsNullOrEmpty(s.UserName) && string.IsNullOrEmpty(s.DomainName))
 					continue;
 
 				WriteObject(new UserSessionInfo
 				{
-					SessionId = native.SessionId,
-					UserName = userName,
-					DomainName = domainName,
-					State = native.State
+					SessionId = s.SessionId,
+					UserName = s.UserName,
+					DomainName = s.DomainName,
+					SessionName = s.SessionName,
+					State = s.State
 				});
 			}
 		}
@@ -45,7 +44,8 @@ namespace PSUserContext.Cmdlets
 		public uint SessionId { get; set; }
 		public string UserName { get; set; } = string.Empty;
 		public string DomainName { get; set; } = string.Empty;
-		public WTS_CONNECTSTATE_CLASS State { get; set; }
+		public string SessionName { get; set; } = string.Empty;
+		public Wtsapi32.SessionState State { get; set; }
 
 		public override string ToString()
 			=> $"{DomainName}\\{UserName} (Session {SessionId}, {State})";

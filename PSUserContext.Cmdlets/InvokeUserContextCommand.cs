@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static PSUserContext.Api.Native.Advapi32;
 using static PSUserContext.Api.Native.InteropTypes;
-using static PSUserContext.Api.Services.ProcessExtensions;
+using static PSUserContext.Api.Services.TokenExtensions;
 
 namespace PSUserContext.Cmdlets
 {
@@ -23,32 +23,41 @@ namespace PSUserContext.Cmdlets
 		public static explicit operator Win32Exception(string message) { return new Win32Exception(message); }
 	}
 
-	[Cmdlet(VerbsLifecycle.Start, "UserProcess", DefaultParameterSetName = "Default", SupportsShouldProcess = true)]
+	[Cmdlet(VerbsLifecycle.Invoke, "UserContext", DefaultParameterSetName = "ByIdDefault", SupportsShouldProcess = true)]
 	[OutputType(typeof(UserProcessResult))]
 	[OutputType(typeof(UserProcessWithOutputResult))]
-	public sealed class StartUserProcessCommand : PSCmdlet
+	public sealed class InvokeUserContextCommand : PSCmdlet
 	{
-		private const string DefaultSet = "Default";
-		private const string RedirectedSet = "Redirected";
-		private const string VisibleSet = "Visible";
+		private const string ByIdDefault = "ByIdDefault";
+		private const string ByIdVisible = "ByIdVisible";
+		private const string ByUserDefault = "ByUserDefault";
+		private const string ByUserVisible = "ByUserVisible";
 
-		[Parameter(Mandatory = true, Position = 0, ParameterSetName = DefaultSet)]
-		[Parameter(Mandatory = true, Position = 0, ParameterSetName = RedirectedSet)]
-		[Parameter(Mandatory = true, Position = 0, ParameterSetName = VisibleSet)]
-		public string CommandLine { get; set; } = string.Empty;
-
-		[Parameter(Position = 1, ParameterSetName = DefaultSet)]
-		[Parameter(Position = 1, ParameterSetName = RedirectedSet)]
-		[Parameter(Position = 1, ParameterSetName = VisibleSet)]
+		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdDefault)]
+		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdVisible)]
+		[Alias("Id")]
 		public uint SessionId { get; set; } = Wtsapi32.INVALID_SESSION_ID;
+
+		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUserDefault)]
+		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUserVisible)]
+		[Alias("Name")]
+		public string UserName { get; set; } = string.Empty;
+
+
+		[Parameter(Mandatory = true, Position = 1)]
+		public string CommandLine { get; set; } = string.Empty;
 
 		// This parameter belongs only to the Redirected parameter set.
 		// Attempting to specify -RedirectOutput together with -ShowWindow will result in a parameter binding error.
-		[Parameter(ParameterSetName = RedirectedSet)]
+		[Parameter(ParameterSetName = ByUserDefault)]
+		[Parameter(ParameterSetName = ByIdDefault)]
+		[Alias("Out")]
 		public SwitchParameter RedirectOutput { get; set; }
 
 		// This parameter belongs only to the Visible parameter set.
-		[Parameter(ParameterSetName = VisibleSet)]
+		[Parameter(ParameterSetName = ByUserVisible)]
+		[Parameter(ParameterSetName = ByIdVisible)]
+		[Alias("Visible")]
 		public SwitchParameter ShowWindow { get; set; }
 
 		private const int BUFFSZ = 4096;
@@ -67,13 +76,13 @@ namespace PSUserContext.Cmdlets
 				throw new InvalidOperationException("failed to create output pipe");
 			if (!Kernel32.CreatePipe(out var err_read, out var err_write, ref saAttr, 0))
 				throw new InvalidOperationException("failed to create error pipe");
-			if (!Kernel32.SetHandleInformation(out_read, HANDLE_FLAG_INHERIT, 0))
+			if (!Kernel32.SetHandleInformation(out_read, HandleFlags.Inherit, 0))
 				throw new InvalidOperationException("failed to set out read handle info");
-			if (!Kernel32.SetHandleInformation(err_read, HANDLE_FLAG_INHERIT, 0))
+			if (!Kernel32.SetHandleInformation(err_read, HandleFlags.Inherit, 0))
 				throw new InvalidOperationException("failed to set err read handle info");
-			if (!Kernel32.SetHandleInformation(out_write, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT))
+			if (!Kernel32.SetHandleInformation(out_write, HandleFlags.Inherit, HandleFlags.Inherit))
 				throw new InvalidOperationException("failed to set out write handle info");
-			if (!Kernel32.SetHandleInformation(err_write, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT))
+			if (!Kernel32.SetHandleInformation(err_write, HandleFlags.Inherit, HandleFlags.Inherit))
 				throw new InvalidOperationException("failed to set err write handle info");
 
 			string PowerShellPath = "C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\powershell.exe";
@@ -100,21 +109,30 @@ namespace PSUserContext.Cmdlets
 			{
 				cb = (uint)Marshal.SizeOf<STARTUPINFO>(),
 				lpDesktop = "winsta0\\default",
-				wShowWindow = ShowWindow ? SW.SW_SHOW : SW.SW_HIDE,
+				wShowWindow = ShowWindow ? SW.SHOW : SW.HIDE,
 				hStdOutput = out_write,
 				hStdError = err_write,
-				dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW,
+				dwFlags = StartupInfoFlags.UseStdHandles | StartupInfoFlags.UseShowWindow,
 			};
 
 			// Creation flags
-			uint dwCreationFlags = CREATE_UNICODE_ENVIRONMENT;
+			var dwCreationFlags = ProcessCreationFlags.CreateUnicodeEnvironment;
 
 			if (!RedirectOutput)
-				dwCreationFlags |= CREATE_NEW_CONSOLE;
+				dwCreationFlags |= ProcessCreationFlags.CreateNewConsole;
 
 			SafeNativeHandle primaryToken;
 
-			primaryToken = GetSessionUserToken(SessionId, false);
+			switch (ParameterSetName)
+			{
+				case ByUserDefault:
+				case ByUserVisible:
+					primaryToken = GetSessionUserToken(UserName, false);
+					break;
+				default:
+					primaryToken = GetSessionUserToken(SessionId, false);
+					break;
+			}
 
 			if (primaryToken == null || primaryToken.IsInvalid)
 			{

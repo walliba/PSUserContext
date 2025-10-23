@@ -6,8 +6,78 @@ using System.Text;
 
 namespace PSUserContext.Api.Native
 {
+	public class Win32Exception : System.ComponentModel.Win32Exception
+	{
+		private readonly string _msg;
+		public Win32Exception(string message) : this(Marshal.GetLastWin32Error(), message) { }
+		public Win32Exception(int errorCode, string message) : base(errorCode)
+		{
+			_msg = String.Format("{0} ({1}, Win32ErrorCode {2} - 0x{2:X8})", message, base.Message, errorCode);
+		}
+		public override string Message { get { return _msg; } }
+		public static explicit operator Win32Exception(string message) { return new Win32Exception(message); }
+	}
+
 	public static class InteropTypes
 	{
+		/// <summary>
+		/// Flags for handle inheritance and protection
+		/// Corresponds to Win32 HANDLE_FLAGS_* constants
+		/// </summary>
+		[Flags]
+		public enum HandleFlags : uint
+		{
+			None = 0x00000000,
+			Inherit = 0x00000001, // HANDLE_FLAG_INHERIT
+			ProtectFromClose = 0x00000002, // HANDLE_FLAG_PROTECT_FROM_CLOSE
+		}
+
+		/// <summary>
+		/// Flags for STARTUPINFO structure.
+		/// Corresponds to Win32 STARTF_* constants
+		/// </summary>
+		[Flags]
+		public enum StartupInfoFlags : uint 
+		{
+			None = 0x00000000,
+			UseShowWindow = 0x00000001,         // STARTF_USESHOWWINDOW
+			UseSize = 0x00000002,               // STARTF_USESIZE
+			UsePosition = 0x00000004,           // STARTF_USEPOSITION
+			UseCountChars = 0x00000008,         // STARTF_USECOUNTCHARS
+			UseFillAttribute = 0x00000010,      // STARTF_USEFILLATTRIBUTE
+			RunFullScreen = 0x00000020,         // STARTF_RUNFULLSCREEN
+			ForceOnFeedback = 0x00000040,       // STARTF_FORCEONFEEDBACK
+			ForceOffFeedback = 0x00000080,      // STARTF_FORCEOFFFEEDBACK
+			UseStdHandles = 0x00000100,         // STARTF_USESTDHANDLES
+			UseHotKey = 0x00000200,             // STARTF_USEHOTKEY
+			TitleIsLinkName = 0x00000800,       // STARTF_TITLEISLINKNAME
+			TitleIsAppId = 0x00001000,          // STARTF_TITLEISAPPID
+			PreventPinning = 0x00002000,        // STARTF_PREVENTPINNING
+			UntrustedSource = 0x00008000,       // STARTF_UNTRUSTEDSOURCE
+		}
+
+		/// <summary>
+		/// Flags controlling process creation behavior.
+		/// Corresponds to CREATE_* constants.
+		/// </summary>
+		[Flags]
+		public enum ProcessCreationFlags : uint
+		{
+			None = 0x00000000,
+			DebugProcess = 0x00000001,                // DEBUG_PROCESS
+			DebugOnlyThisProcess = 0x00000002,        // DEBUG_ONLY_THIS_PROCESS
+			CreateSuspended = 0x00000004,             // CREATE_SUSPENDED
+			CreateNewConsole = 0x00000010,            // CREATE_NEW_CONSOLE
+			CreateNewProcessGroup = 0x00000200,       // CREATE_NEW_PROCESS_GROUP
+			CreateUnicodeEnvironment = 0x00000400,    // CREATE_UNICODE_ENVIRONMENT
+			CreateSeparateWowVdm = 0x00000800,        // CREATE_SEPARATE_WOW_VDM
+			CreateSharedWowVdm = 0x00001000,          // CREATE_SHARED_WOW_VDM
+			CreateProtectedProcess = 0x00040000,      // CREATE_PROTECTED_PROCESS
+			CreateBreakawayFromJob = 0x01000000,      // CREATE_BREAKAWAY_FROM_JOB
+			CreatePreserveCodeAuthzLevel = 0x02000000,// CREATE_PRESERVE_CODE_AUTHZ_LEVEL
+			CreateDefaultErrorMode = 0x04000000,      // CREATE_DEFAULT_ERROR_MODE
+			CreateNoWindow = 0x08000000,              // CREATE_NO_WINDOW
+		}
 
 		public enum TOKEN_INFORMATION_CLASS
 		{
@@ -73,20 +143,20 @@ namespace PSUserContext.Api.Native
 
 		public enum SW : ushort
 		{
-			SW_HIDE = 0,
-			SW_SHOWNORMAL = 1,
-			SW_NORMAL = 1,
-			SW_SHOWMINIMIZED = 2,
-			SW_SHOWMAXIMIZED = 3,
-			SW_MAXIMIZE = 3,
-			SW_SHOWNOACTIVATE = 4,
-			SW_SHOW = 5,
-			SW_MINIMIZE = 6,
-			SW_SHOWMINNOACTIVE = 7,
-			SW_SHOWNA = 8,
-			SW_RESTORE = 9,
-			SW_SHOWDEFAULT = 10,
-			SW_MAX = 10
+			HIDE = 0,
+			SHOWNORMAL = 1,
+			NORMAL = 1,
+			SHOWMINIMIZED = 2,
+			SHOWMAXIMIZED = 3,
+			MAXIMIZE = 3,
+			SHOWNOACTIVATE = 4,
+			SHOW = 5,
+			MINIMIZE = 6,
+			SHOWMINNOACTIVE = 7,
+			SHOWNA = 8,
+			RESTORE = 9,
+			SHOWDEFAULT = 10,
+			MAX = 10
 		}
 
 		public enum TokenElevationType
@@ -147,10 +217,10 @@ namespace PSUserContext.Api.Native
 			public uint dwXCountChars;
 			public uint dwYCountChars;
 			public uint dwFillAttribute;
-			public uint dwFlags;
+			public StartupInfoFlags dwFlags;
 			public SW wShowWindow;
-			public ushort cbReserved2;
-			public IntPtr lpReserved2;
+			public ushort cbReserved2; // Must be zero
+			public IntPtr lpReserved2; // Must be IntPtr.Zero
 			public IntPtr hStdInput;
 			public SafeHandle hStdOutput;
 			public SafeHandle hStdError;
