@@ -72,12 +72,12 @@ namespace PSUserContext.Api.Services
 					for (int i = 0; i < count; i++)
 					{
 						IntPtr recordPtr = ppSessionInfo.DangerousGetHandle() + i * dataSize;
-						var native = Marshal.PtrToStructure<WTS_SESSION_INFO>(recordPtr);
-						var userName = Wtsapi32.GetSessionString(native.SessionId, WTS_INFO_CLASS.WTSUserName);
-						var domainName = Wtsapi32.GetSessionString(native.SessionId, WTS_INFO_CLASS.WTSDomainName);
-						var sessionName = Wtsapi32.GetSessionString(native.SessionId, WTS_INFO_CLASS.WTSWinStationName);
+						var sInfo = Marshal.PtrToStructure<WTS_SESSION_INFO>(recordPtr);
+						var userName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSUserName);
+						var domainName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSDomainName);
+						var sessionName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSWinStationName);
 
-						sessions.Add(new SessionInfo(native.SessionId, userName, domainName, sessionName, native.State));
+						sessions.Add(new SessionInfo(sInfo.SessionId, userName, domainName, sessionName, sInfo.State));
 					}
 				}
 				finally
