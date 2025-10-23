@@ -17,21 +17,6 @@ namespace PSUserContext.Api.Native
 
 		public static readonly IntPtr WTS_CURRENT_SERVER_HANDLE = IntPtr.Zero;
 
-		// WTS_CONNECTSTATE_CLASS
-		public enum SessionState
-		{
-			Active,
-			Connected,
-			ConnectQuery,
-			Shadow,
-			Disconnected,
-			Idle,
-			Listen,
-			Reset,
-			Down,
-			Init
-		}
-
 		public enum WTS_INFO_CLASS
 		{
 			WTSInitialProgram,
@@ -72,7 +57,7 @@ namespace PSUserContext.Api.Native
 		{
 			public readonly uint SessionId;
 			[MarshalAs(UnmanagedType.LPWStr)] public readonly string pWinStationName;
-			public readonly SessionState State;
+			public readonly Models.WtsSessionState State;
 		}
 
 		[DllImport(DllName, CharSet = CharSet.Unicode, SetLastError = true)]

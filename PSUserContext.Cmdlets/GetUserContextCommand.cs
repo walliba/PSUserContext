@@ -1,4 +1,4 @@
-﻿using PSUserContext.Api.Native;
+﻿using PSUserContext.Api.Models;
 using PSUserContext.Api.Services;
 using System.Management.Automation;
 using static PSUserContext.Api.Native.Wtsapi32;
@@ -6,7 +6,7 @@ using static PSUserContext.Api.Native.Wtsapi32;
 namespace PSUserContext.Cmdlets
 {
 	[Cmdlet(VerbsCommon.Get, "UserContext")]
-	[OutputType(typeof(SessionInfo))]
+	[OutputType(typeof(WtsSessionInfo))]
 	public sealed class GetUserContextCommand : PSCmdlet
 	{
 		protected override void ProcessRecord()
@@ -17,7 +17,7 @@ namespace PSUserContext.Cmdlets
 			foreach (var s in sessions)
 			{
 				// Skip listening sessions
-				if (s.State == Wtsapi32.SessionState.Listen)
+				if (s.State == WtsSessionState.Listen)
 					continue;
 
 				// Skip sessions with no user

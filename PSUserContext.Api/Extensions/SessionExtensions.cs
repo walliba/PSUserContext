@@ -1,4 +1,5 @@
 ﻿using PSUserContext.Api.Helpers;
+using PSUserContext.Api.Models;
 using PSUserContext.Api.Native;
 using System;
 using System.Collections.Generic;
@@ -10,26 +11,6 @@ using static PSUserContext.Api.Native.Wtsapi32;
 
 namespace PSUserContext.Api.Services
 {
-	public class SessionInfo
-	{
-		public uint SessionId { get; private set; }
-		public string UserName { get; private set; } = string.Empty;
-		public string DomainName { get; private set; } = string.Empty;
-		public string SessionName { get; private set; } = string.Empty;
-		public SessionState State { get; private set; }
-		public override string ToString()
-			=> $"{DomainName}\\{UserName} (Session {SessionId}, {State})";
-
-		public SessionInfo(uint sessionId, string? userName, string? domainName, string? sessionName, SessionState state)
-		{
-			SessionId = sessionId;
-			UserName = userName ?? string.Empty;
-			DomainName = domainName ?? string.Empty;
-			SessionName = sessionName ?? string.Empty;
-			State = state;
-		}
-	}
-
 	public static class SessionExtensions
 	{
 		public static uint? GetActiveConsoleSessionId()
@@ -44,7 +25,7 @@ namespace PSUserContext.Api.Services
 
 
 		// todo: may or may not implement later
-		public static SessionInfo GetSession(string userName, string? domainName = null)
+		public static WtsSessionInfo GetSession(string userName, string? domainName = null)
 		{
 			var sessions = GetSessions();
 			return sessions.FirstOrDefault(s =>
@@ -52,9 +33,9 @@ namespace PSUserContext.Api.Services
 				(domainName is null || string.Equals(s.DomainName, domainName, StringComparison.OrdinalIgnoreCase)));
 		}
 
-		public static List<SessionInfo> GetSessions()
+		public static List<WtsSessionInfo> GetSessions()
 		{
-			List<SessionInfo> sessions = new List<SessionInfo>();
+			List<WtsSessionInfo> sessions = new List<WtsSessionInfo>();
 
 
 			if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out SafeWtsMemoryHandle ppSessionInfo, out int count))
@@ -77,7 +58,7 @@ namespace PSUserContext.Api.Services
 						var domainName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSDomainName);
 						var sessionName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSWinStationName);
 
-						sessions.Add(new SessionInfo(sInfo.SessionId, userName, domainName, sessionName, sInfo.State));
+						sessions.Add(new WtsSessionInfo(sInfo.SessionId, userName, domainName, sessionName, sInfo.State));
 					}
 				}
 				finally
