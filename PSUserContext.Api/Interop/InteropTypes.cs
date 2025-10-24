@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using PSUserContext.Api.Extensions;
 
-namespace PSUserContext.Api.Native
+namespace PSUserContext.Api.Interop
 {
 	public class Win32Exception : System.ComponentModel.Win32Exception
 	{
@@ -19,42 +20,6 @@ namespace PSUserContext.Api.Native
 	{
 
 		public const uint INVALID_SESSION_ID = 0xFFFFFFFF;
-
-		/// <summary>
-		/// Flags for handle inheritance and protection
-		/// Corresponds to Win32 HANDLE_FLAGS_* constants
-		/// </summary>
-		[Flags]
-		public enum HandleFlags : uint
-		{
-			None = 0x00000000,
-			Inherit = 0x00000001, // HANDLE_FLAG_INHERIT
-			ProtectFromClose = 0x00000002, // HANDLE_FLAG_PROTECT_FROM_CLOSE
-		}
-
-		/// <summary>
-		/// Flags for STARTUPINFO structure.
-		/// Corresponds to Win32 STARTF_* constants
-		/// </summary>
-		[Flags]
-		public enum StartupInfoFlags : uint 
-		{
-			None = 0x00000000,
-			UseShowWindow = 0x00000001,         // STARTF_USESHOWWINDOW
-			UseSize = 0x00000002,               // STARTF_USESIZE
-			UsePosition = 0x00000004,           // STARTF_USEPOSITION
-			UseCountChars = 0x00000008,         // STARTF_USECOUNTCHARS
-			UseFillAttribute = 0x00000010,      // STARTF_USEFILLATTRIBUTE
-			RunFullScreen = 0x00000020,         // STARTF_RUNFULLSCREEN
-			ForceOnFeedback = 0x00000040,       // STARTF_FORCEONFEEDBACK
-			ForceOffFeedback = 0x00000080,      // STARTF_FORCEOFFFEEDBACK
-			UseStdHandles = 0x00000100,         // STARTF_USESTDHANDLES
-			UseHotKey = 0x00000200,             // STARTF_USEHOTKEY
-			TitleIsLinkName = 0x00000800,       // STARTF_TITLEISLINKNAME
-			TitleIsAppId = 0x00001000,          // STARTF_TITLEISAPPID
-			PreventPinning = 0x00002000,        // STARTF_PREVENTPINNING
-			UntrustedSource = 0x00008000,       // STARTF_UNTRUSTEDSOURCE
-		}
 
 		public enum TOKEN_INFORMATION_CLASS
 		{
@@ -171,13 +136,14 @@ namespace PSUserContext.Api.Native
 			public LUID Luid;
 			public PrivilegeAttributes Attributes;
 		}
+		
 		[StructLayout(LayoutKind.Sequential)]
 		public struct PROCESS_INFORMATION
 		{
 			public IntPtr hProcess;
 			public IntPtr hThread;
-			public int dwProcessId;
-			public int dwThreadId;
+			public uint dwProcessId;
+			public uint dwThreadId;
 		}
 
 		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -194,10 +160,10 @@ namespace PSUserContext.Api.Native
 			public uint dwXCountChars;
 			public uint dwYCountChars;
 			public uint dwFillAttribute;
-			public StartupInfoFlags dwFlags;
+			public ProcessExtensions.StartupInfoFlags dwFlags;
 			public SW wShowWindow;
-			public ushort cbReserved2; // Must be zero
-			public IntPtr lpReserved2; // Must be IntPtr.Zero
+			private ushort cbReserved2; // Must be zero
+			private IntPtr lpReserved2; // Must be IntPtr.Zero
 			public IntPtr hStdInput;
 			public SafeHandle hStdOutput;
 			public SafeHandle hStdError;
@@ -214,9 +180,9 @@ namespace PSUserContext.Api.Native
 		[StructLayout(LayoutKind.Sequential)]
 		public struct SECURITY_ATTRIBUTES
 		{
-			public Int32 nLength;
+			public uint nLength;
 			public IntPtr lpSecurityDescriptor;
-			public int bInheritHandle;
+			public bool bInheritHandle;
 		}
 	}
 }

@@ -2,9 +2,9 @@
 using PSUserContext.Api.Helpers;
 using System;
 using System.Runtime.InteropServices;
-using static PSUserContext.Api.Native.InteropTypes;
+using static PSUserContext.Api.Interop.InteropTypes;
 
-namespace PSUserContext.Api.Native
+namespace PSUserContext.Api.Interop
 {
 	internal static class Kernel32
 	{
@@ -30,20 +30,20 @@ namespace PSUserContext.Api.Native
 		internal static extern bool CreatePipe(
 			out SafeFileHandle hReadPipe,
 			out SafeFileHandle hWritePipe,
-			ref SECURITY_ATTRIBUTES lpPipeAttributes,
+			ref InteropTypes.SECURITY_ATTRIBUTES lpPipeAttributes,
 			uint nSize);
 
 		[DllImport(DllName, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool SetHandleInformation(
 			SafeHandle hObject,
-			HandleFlags dwMask,
-			HandleFlags dwFlags);
+			uint dwMask,	// HandleFlags
+			uint dwFlags);	// HandleFlags
 
 		[DllImport(DllName, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool ReadFile(
-			SafeHandle hFile,
+			SafeFileHandle hFile,
 			byte[] lpBuffer,
 			int nNumberOfBytesToRead,
 			ref uint lpNumberOfBytesRead,

@@ -6,8 +6,8 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
-using PSUserContext.Api.Native;
-using static PSUserContext.Api.Native.InteropTypes;
+using PSUserContext.Api.Interop;
+using static PSUserContext.Api.Interop.InteropTypes;
 
 namespace PSUserContext.Api.Extensions
 {
@@ -43,7 +43,7 @@ namespace PSUserContext.Api.Extensions
 			{
 				int error = Marshal.GetLastWin32Error();
 				if (error != ERROR_INSUFFICIENT_BUFFER && error != ERROR_BAD_LENGTH)
-					throw new Native.Win32Exception(error, $"GetTokenInformation({infoClass}) failed to query buffer size.");
+					throw new Interop.Win32Exception(error, $"GetTokenInformation({infoClass}) failed to query buffer size.");
 			}
 
 			// Kinda silly since its a uint, but oh well
@@ -57,7 +57,7 @@ namespace PSUserContext.Api.Extensions
 			{
 				// Second call — retrieve actual information
 				if (!Advapi32.GetTokenInformation(hToken, infoClass, buffer, requiredLength, out _))
-					throw new Native.Win32Exception(Marshal.GetLastWin32Error(), $"GetTokenInformation({infoClass}) failed.");
+					throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), $"GetTokenInformation({infoClass}) failed.");
 
 				return buffer; // ownership transferred to caller
 			}
@@ -71,7 +71,7 @@ namespace PSUserContext.Api.Extensions
 		public static SafeNativeHandle DuplicateTokenAsPrimary(SafeHandle hToken)
 		{
 			if (!Advapi32.DuplicateTokenEx(hToken, 0, IntPtr.Zero, SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, InteropTypes.TOKEN_TYPE.TokenPrimary, out SafeNativeHandle pDupToken))
-				throw new Native.Win32Exception("Failed to duplicate impersonation token as primary");
+				throw new Interop.Win32Exception("Failed to duplicate impersonation token as primary");
 
 			return pDupToken;
 		}
@@ -81,7 +81,7 @@ namespace PSUserContext.Api.Extensions
 			Dictionary<string, PrivilegeAttributes> privileges = new Dictionary<string, PrivilegeAttributes>();
 
 			if (!Advapi32.OpenProcessToken(Kernel32.GetCurrentProcess(), TokenAccessLevels.Query, out var hToken))
-				throw new Native.Win32Exception(Marshal.GetLastWin32Error(), "Failed to get current process token");
+				throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), "Failed to get current process token");
 
 			using (hToken)
 			using (SafeHGlobalBuffer tokenInfo = GetTokenInformation(hToken, 3))
@@ -102,7 +102,7 @@ namespace PSUserContext.Api.Extensions
 
 					StringBuilder name = new StringBuilder((int)(nameLen + 1));
 					if (!Advapi32.LookupPrivilegeName(null, ref info.Luid, name, ref nameLen))
-						throw new Native.Win32Exception(Marshal.GetLastWin32Error(), "LookupPrivilegeName failed");
+						throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), "LookupPrivilegeName failed");
 
 					privileges[name.ToString()] = info.Attributes;
 
@@ -145,7 +145,7 @@ namespace PSUserContext.Api.Extensions
 				if (error is 2 or 87 or 7022)
 					throw new InvalidOperationException($"The session ID {sessionId} does not exist");
 
-				throw new Native.Win32Exception(Marshal.GetLastWin32Error(), $"Failed to query user token for session {sessionId}");
+				throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), $"Failed to query user token for session {sessionId}");
 			}
 
 

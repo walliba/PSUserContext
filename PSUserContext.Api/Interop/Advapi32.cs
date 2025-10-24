@@ -1,12 +1,13 @@
 ﻿using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Helpers;
+using PSUserContext.Api.Models;
 using System;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
-using static PSUserContext.Api.Native.InteropTypes;
+using static PSUserContext.Api.Interop.InteropTypes;
 
-namespace PSUserContext.Api.Native
+namespace PSUserContext.Api.Interop
 {
 	internal static class Advapi32
 	{
@@ -29,7 +30,7 @@ namespace PSUserContext.Api.Native
 			IntPtr lpProcessAttributes,
 			IntPtr lpThreadAttributes,
 			[MarshalAs(UnmanagedType.Bool)] bool bInheritHandles,
-			ProcessCreationFlags dwCreationFlags,
+			uint dwCreationFlags,
 			SafeHandle lpEnvironment,
 			string lpCurrentDirectory,
 			ref STARTUPINFO lpStartupInfo,

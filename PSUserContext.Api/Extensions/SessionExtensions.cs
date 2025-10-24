@@ -1,13 +1,13 @@
 ﻿using PSUserContext.Api.Helpers;
 using PSUserContext.Api.Models;
-using PSUserContext.Api.Native;
+using PSUserContext.Api.Interop;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using static PSUserContext.Api.Native.Wtsapi32;
+using static PSUserContext.Api.Interop.Wtsapi32;
 
 namespace PSUserContext.Api.Extensions
 {
@@ -25,7 +25,7 @@ namespace PSUserContext.Api.Extensions
 
 
 		// todo: may or may not implement later
-		public static WtsSessionInfo GetSession(string userName, string? domainName = null)
+		public static WtsSessionInfo? GetSession(string userName, string? domainName = null)
 		{
 			var sessions = GetSessions();
 			return sessions.FirstOrDefault(s =>
@@ -36,8 +36,7 @@ namespace PSUserContext.Api.Extensions
 		public static List<WtsSessionInfo> GetSessions()
 		{
 			List<WtsSessionInfo> sessions = new List<WtsSessionInfo>();
-
-
+			
 			if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out SafeWtsMemoryHandle ppSessionInfo, out int count))
 				throw new Win32Exception(Marshal.GetLastWin32Error(), "WTSEnumerateSessions failed.");
 

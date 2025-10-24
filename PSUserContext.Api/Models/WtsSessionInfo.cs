@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static PSUserContext.Api.Native.Wtsapi32;
+using static PSUserContext.Api.Interop.Wtsapi32;
 
 namespace PSUserContext.Api.Models
 {

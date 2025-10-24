@@ -2,7 +2,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace PSUserContext.Api.Native
+namespace PSUserContext.Api.Interop
 {
 	internal static class Userenv
 	{

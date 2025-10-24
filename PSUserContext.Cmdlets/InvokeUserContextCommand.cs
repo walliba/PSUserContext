@@ -1,11 +1,9 @@
 ﻿using PSUserContext.Api.Helpers;
-using PSUserContext.Api.Native;
+using PSUserContext.Api.Interop;
 using System;
 using System.Management.Automation;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
-using static PSUserContext.Api.Native.InteropTypes;
 using PSUserContext.Api.Extensions;
 
 namespace PSUserContext.Cmdlets
@@ -32,14 +30,14 @@ namespace PSUserContext.Cmdlets
 
 		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ById)]
 		[Alias("Id")]
-		public uint SessionId { get; set; } = INVALID_SESSION_ID;
+		public uint SessionId { get; set; } = InteropTypes.INVALID_SESSION_ID;
 
 		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUser)]
 		[Alias("Name")]
 		public string UserName { get; set; } = string.Empty;
 
 		[Parameter(Mandatory = true, Position = 1)]
-		public string CommandLine { get; set; } = string.Empty;
+		public string Command { get; set; } = string.Empty;
 
 		// This parameter belongs only to the Redirected parameter set.
 		// Attempting to specify -RedirectOutput together with -ShowWindow will result in a parameter binding error.
@@ -58,63 +56,25 @@ namespace PSUserContext.Cmdlets
 			if (ShowWindow.IsPresent && RedirectOutput.IsPresent)
 				throw new ParameterBindingException("The parameters -ShowWindow and -RedirectOutput cannot be used together.");
 
-			if (!ShouldProcess(CommandLine)) return;
-
-			SECURITY_ATTRIBUTES saAttr = new SECURITY_ATTRIBUTES
-			{
-				nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(),
-				bInheritHandle = 0x1,
-				lpSecurityDescriptor = IntPtr.Zero,
-			};
-
-			if (!Kernel32.CreatePipe(out var out_read, out var out_write, ref saAttr, 0))
-				throw new InvalidOperationException("failed to create output pipe");
-			if (!Kernel32.CreatePipe(out var err_read, out var err_write, ref saAttr, 0))
-				throw new InvalidOperationException("failed to create error pipe");
-			if (!Kernel32.SetHandleInformation(out_read, HandleFlags.Inherit, 0))
-				throw new InvalidOperationException("failed to set out read handle info");
-			if (!Kernel32.SetHandleInformation(err_read, HandleFlags.Inherit, 0))
-				throw new InvalidOperationException("failed to set err read handle info");
-			if (!Kernel32.SetHandleInformation(out_write, HandleFlags.Inherit, HandleFlags.Inherit))
-				throw new InvalidOperationException("failed to set out write handle info");
-			if (!Kernel32.SetHandleInformation(err_write, HandleFlags.Inherit, HandleFlags.Inherit))
-				throw new InvalidOperationException("failed to set err write handle info");
+			if (!ShouldProcess(Command)) return;
 
 			string PowerShellPath = "C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\powershell.exe";
 
-			var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(CommandLine));
+			var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(Command));
 
-			CommandLine = $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle {(ShowWindow ? "Normal" : "Hidden")} -EncodedCommand {encodedCommand}";
+			var sbCommand = new StringBuilder($"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle {(ShowWindow ? "Normal" : "Hidden")} -EncodedCommand {encodedCommand}");
 
 			// Retrieve token privileges dictionary
 			var privileges = TokenExtensions.GetTokenPrivileges();
 
 			// Try to get the specific privilege
 			if (!privileges.TryGetValue("SeDelegateSessionUserImpersonatePrivilege", out var privilegeAttr) ||
-				(privilegeAttr == PrivilegeAttributes.Disabled))
+				(privilegeAttr == InteropTypes.PrivilegeAttributes.Disabled))
 			{
 				throw new InvalidOperationException(
 					"Not running with correct privilege. You must run this script as SYSTEM " +
 					"or have the SeDelegateSessionUserImpersonatePrivilege token.");
 			}
-
-			// Set up STARTUPINFOEX
-			PROCESS_INFORMATION pi;
-			var si = new STARTUPINFO
-			{
-				cb = (uint)Marshal.SizeOf<STARTUPINFO>(),
-				lpDesktop = "winsta0\\default",
-				wShowWindow = ShowWindow ? SW.SHOW : SW.HIDE,
-				hStdOutput = out_write,
-				hStdError = err_write,
-				dwFlags = StartupInfoFlags.UseStdHandles | StartupInfoFlags.UseShowWindow,
-			};
-
-			// Creation flags
-			var dwCreationFlags = ProcessCreationFlags.CreateUnicodeEnvironment;
-
-			if (!RedirectOutput)
-				dwCreationFlags |= ProcessCreationFlags.CreateNewConsole;
 
 			SafeNativeHandle primaryToken;
 
@@ -135,80 +95,42 @@ namespace PSUserContext.Cmdlets
 
 			using (primaryToken)
 			{
-				// Create environment block
-				using (var environment = EnvExtensions.CreateEnvironmentBlock(primaryToken))
+				
+				var redirectOptions = (RedirectOutput ? ProcessExtensions.RedirectFlags.Output | ProcessExtensions.RedirectFlags.Error : ProcessExtensions.RedirectFlags.None);
+
+				using (var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
+					       new ProcessExtensions.ProcessOptions
+					       {
+						       ApplicationName = PowerShellPath,
+						       CommandLine = sbCommand,
+						       Redirect = redirectOptions,
+						       WindowStyle = (ShowWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE)
+					       }))
 				{
-					WriteVerbose("Envblock handle created");
-
-					WriteVerbose("Launching process");
-					// Launch process
-					if (!Advapi32.CreateProcessAsUserW(
-						primaryToken,
-						PowerShellPath,
-						new StringBuilder(CommandLine),
-						IntPtr.Zero,
-						IntPtr.Zero,
-						RedirectOutput.ToBool(),
-						dwCreationFlags,
-						environment,
-						"C:\\Windows\\System32",
-						ref si,
-						out pi))
-					{
-						throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessAsUser failed");
-					}
-
-					out_write?.Dispose();
-					err_write?.Dispose();
-
-					try
-					{
-						Kernel32.WaitForSingleObject(pi.hProcess, Kernel32.INFINITE);
-					}
-					finally
-					{
-						Kernel32.CloseHandle(pi.hThread);
-						Kernel32.CloseHandle(pi.hProcess);
-					}
+					if (RedirectOutput.IsPresent)
+						WriteObject(new UserProcessWithOutputResult
+						{
+							ProcessId = result.ProcessId,
+							SessionId = SessionId,
+							CommandLine = sbCommand.ToString(),
+							StandardOutput = result.StandardOutput?.ReadToEnd() ?? string.Empty,
+							StandardError = result.StandardError?.ReadToEnd() ?? string.Empty
+						});
+					else
+						WriteObject(new UserProcessResult
+						{
+							ProcessId = result.ProcessId,
+							SessionId = SessionId,
+							CommandLine = sbCommand.ToString(),
+						});	
 				}
 			}
-
-			if (RedirectOutput)
-			{
-				var stdOutTask = Helper.ReadPipeTask(out_read, Encoding.Default);
-				var stdErrTask = Helper.ReadPipeTask(err_read, Encoding.Default);
-
-				Task.WaitAll(stdOutTask, stdErrTask);
-
-				WriteObject(new UserProcessWithOutputResult
-				{
-					ProcessId = pi.dwProcessId,
-					ThreadId = pi.dwThreadId,
-					SessionId = SessionId,
-					CommandLine = CommandLine,
-					StandardOutput = stdOutTask.Result,
-					StandardError = stdErrTask.Result,
-				});
-			} 
-			else
-			{
-				WriteObject(new UserProcessResult
-				{
-					ProcessId = pi.dwProcessId,
-					ThreadId = pi.dwThreadId,
-					SessionId = SessionId,
-					CommandLine = CommandLine
-				});
-			}
-			out_read?.Dispose();
-			err_read?.Dispose();
 		}
 	}
 
 	public class UserProcessResult
 	{
-		public int ProcessId { get; set; }
-		public int ThreadId { get; set; }
+		public uint ProcessId { get; set; }
 		public uint SessionId { get; set; }
 		public string CommandLine { get; set; } = string.Empty;
 		public override string ToString() => $"PID {ProcessId} (Session {SessionId}): {CommandLine}";

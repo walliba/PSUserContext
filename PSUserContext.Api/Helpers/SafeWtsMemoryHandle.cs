@@ -1,5 +1,5 @@
 ﻿using Microsoft.Win32.SafeHandles;
-using PSUserContext.Api.Native;
+using PSUserContext.Api.Interop;
 using System;
 using System.Collections.Generic;
 using System.Text;
