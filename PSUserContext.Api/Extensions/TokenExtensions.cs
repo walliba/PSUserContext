@@ -129,7 +129,7 @@ namespace PSUserContext.Api.Extensions
 			if (match is null)
 				throw new InvalidOperationException($"No sessions found matching user '{username}'");
 
-			return GetSessionUserToken(match.SessionId, elevated);
+			return GetSessionUserToken(match.Id, elevated);
 		}
 
 		public static SafeNativeHandle GetSessionUserToken(uint sessionId, bool elevated = false)

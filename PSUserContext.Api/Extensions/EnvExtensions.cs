@@ -11,7 +11,7 @@ namespace PSUserContext.Api.Extensions
 {
 	public static class EnvExtensions
 	{
-		public static SafeEnvironmentBlockHandle CreateEnvironmentBlock(SafeHandle hToken, bool inherit = false)
+		internal static SafeEnvironmentBlockHandle CreateEnvironmentBlock(SafeHandle hToken, bool inherit = false)
 		{
 			if (!Interop.Userenv.CreateEnvironmentBlock(out SafeEnvironmentBlockHandle environment, hToken, inherit))
 				throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to create environment block.");
@@ -22,14 +22,49 @@ namespace PSUserContext.Api.Extensions
 			return environment;
 		}
 
-		public static string? GetVariable(this SafeEnvironmentBlockHandle? env, string key)
+		private static string? LatentGetVariable(this SafeEnvironmentBlockHandle? env, string key)
 		{
 			if (env is null || env.IsInvalid)
 				throw new ObjectDisposedException(nameof(env));
 			
-			var dict = GetEnvironment(env);
+			var dict = LatentGetEnvironment(env);
 			
 			return dict.TryGetValue(key, out var variable) ? variable : null;
+		}
+		
+		public static string? GetVariable(uint sessionId, string key)
+		{
+			using (var hToken = TokenExtensions.GetSessionUserToken(sessionId))
+			using (var hEnvironment = CreateEnvironmentBlock(hToken))
+			{
+				return LatentGetVariable(hEnvironment, key);
+			}
+		}
+		public static string? GetVariable(string userName, string key)
+		{
+			using (var hToken = TokenExtensions.GetSessionUserToken(userName))
+			using (var hEnvironment = CreateEnvironmentBlock(hToken))
+			{
+				return LatentGetVariable(hEnvironment, key);
+			}
+		}
+
+		public static Dictionary<string, string> GetVariables(uint sessionId)
+		{
+			using (var hToken = TokenExtensions.GetSessionUserToken(sessionId))
+			using (var hEnvironment = CreateEnvironmentBlock(hToken))
+			{
+				return LatentGetEnvironment(hEnvironment);
+			}
+		}
+
+		public static Dictionary<string, string> GetVariables(string userName)
+		{
+			using (var hToken = TokenExtensions.GetSessionUserToken(userName))
+			using (var hEnvironment = CreateEnvironmentBlock(hToken))
+			{
+				return LatentGetEnvironment(hEnvironment);
+			}
 		}
 		
 		/// <summary>
@@ -63,7 +98,7 @@ namespace PSUserContext.Api.Extensions
 		/// need to perform any manual memory management.
 		/// </para>
 		/// </remarks>
-		public static IDictionary<string, string> GetEnvironment(this SafeEnvironmentBlockHandle? env)
+		private static Dictionary<string, string> LatentGetEnvironment(this SafeEnvironmentBlockHandle? env)
 		{
 			if (env is null || env.IsInvalid)
 				throw new ObjectDisposedException(nameof(env));
@@ -83,7 +118,7 @@ namespace PSUserContext.Api.Extensions
 					if (string.IsNullOrEmpty(entry))
 						break;
 
-					int sep = entry.IndexOf('-');
+					int sep = entry.IndexOf('=');
 					if (sep > 0)
 					{
 						dict[entry.Substring(0, sep)] = entry.Substring(sep + 1);

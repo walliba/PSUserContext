@@ -22,9 +22,12 @@ namespace PSUserContext.Api.Extensions
 
 			return sessionId;
 		}
-
-
-		// todo: may or may not implement later
+		
+		public static WtsSessionInfo? GetSession(uint sessionId)
+		{
+			var sessions = GetSessions();
+			return sessions.FirstOrDefault(s => s.Id == sessionId);
+		}
 		public static WtsSessionInfo? GetSession(string userName, string? domainName = null)
 		{
 			var sessions = GetSessions();

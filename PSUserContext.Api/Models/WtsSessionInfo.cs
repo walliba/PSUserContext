@@ -3,37 +3,41 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PSUserContext.Api.Extensions;
 using static PSUserContext.Api.Interop.Wtsapi32;
 
 namespace PSUserContext.Api.Models
 {
-	public class WtsSessionInfo
+	public class WtsSessionInfo(
+		uint id,
+		string? userName,
+		string? domainName,
+		string? sessionName,
+		WtsSessionState state)
 	{
-		public uint SessionId { get; private set; }
-		public string UserName { get; private set; } = string.Empty;
-		public string DomainName { get; private set; } = string.Empty;
-		public string SessionName { get; private set; } = string.Empty;
-		public WtsSessionState State { get; private set; }
+		public string DomainName { get; init; } = domainName ?? string.Empty;
+		public string UserName { get; init; } = userName ?? string.Empty;
+		public uint Id { get; init; } = id;
+		public string SessionName { get; init; } = sessionName ?? string.Empty;
+		public WtsSessionState State { get; private set; } = state;
+
 		public override string ToString()
-			=> $"{DomainName}\\{UserName} (Session {SessionId}, {State})";
+			=> $"{DomainName}\\{UserName} (Session {Id}, {State})";
 
-		public WtsSessionInfo(uint sessionId, string? userName, string? domainName, string? sessionName, WtsSessionState state)
+		public string? GetEnvironmentVariable(string variableName)
 		{
-			SessionId = sessionId;
-			UserName = userName ?? string.Empty;
-			DomainName = domainName ?? string.Empty;
-			SessionName = sessionName ?? string.Empty;
-			State = state;
+			return EnvExtensions.GetVariable(this.Id, variableName);
 		}
-
+		
+		public Dictionary<string, string> GetEnvironment()
+		{
+			return EnvExtensions.GetVariables(this.Id);
+		}
 		public string? GetDownLevelName(bool fallback = false)
 		{
 			if (string.IsNullOrEmpty(DomainName))
 			{
-				if (fallback)
-					return UserName;
-
-				return null;
+				return fallback ? UserName : null;
 			}
 			else
 			{
