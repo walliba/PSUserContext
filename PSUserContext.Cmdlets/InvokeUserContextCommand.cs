@@ -5,9 +5,8 @@ using System.Management.Automation;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using static PSUserContext.Api.Native.Advapi32;
 using static PSUserContext.Api.Native.InteropTypes;
-using static PSUserContext.Api.Services.TokenExtensions;
+using PSUserContext.Api.Extensions;
 
 namespace PSUserContext.Cmdlets
 {
@@ -23,46 +22,42 @@ namespace PSUserContext.Cmdlets
 		public static explicit operator Win32Exception(string message) { return new Win32Exception(message); }
 	}
 
-	[Cmdlet(VerbsLifecycle.Invoke, "UserContext", DefaultParameterSetName = "ByIdDefault", SupportsShouldProcess = true)]
+	[Cmdlet(VerbsLifecycle.Invoke, "UserContext", DefaultParameterSetName = "ById", SupportsShouldProcess = true)]
 	[OutputType(typeof(UserProcessResult))]
 	[OutputType(typeof(UserProcessWithOutputResult))]
 	public sealed class InvokeUserContextCommand : PSCmdlet
 	{
-		private const string ByIdDefault = "ByIdDefault";
-		private const string ByIdVisible = "ByIdVisible";
-		private const string ByUserDefault = "ByUserDefault";
-		private const string ByUserVisible = "ByUserVisible";
+		private const string ById = "ById";
+		private const string ByUser = "ByUser";
 
-		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdDefault)]
-		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdVisible)]
+		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ById)]
 		[Alias("Id")]
-		public uint SessionId { get; set; } = Wtsapi32.INVALID_SESSION_ID;
+		public uint SessionId { get; set; } = INVALID_SESSION_ID;
 
-		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUserDefault)]
-		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUserVisible)]
+		[Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUser)]
 		[Alias("Name")]
 		public string UserName { get; set; } = string.Empty;
-
 
 		[Parameter(Mandatory = true, Position = 1)]
 		public string CommandLine { get; set; } = string.Empty;
 
 		// This parameter belongs only to the Redirected parameter set.
 		// Attempting to specify -RedirectOutput together with -ShowWindow will result in a parameter binding error.
-		[Parameter(ParameterSetName = ByUserDefault)]
-		[Parameter(ParameterSetName = ByIdDefault)]
+		[Parameter()]
 		[Alias("Out")]
 		public SwitchParameter RedirectOutput { get; set; }
 
 		// This parameter belongs only to the Visible parameter set.
-		[Parameter(ParameterSetName = ByUserVisible)]
-		[Parameter(ParameterSetName = ByIdVisible)]
+		[Parameter()]
 		[Alias("Visible")]
 		public SwitchParameter ShowWindow { get; set; }
 
 		private const int BUFFSZ = 4096;
 		protected override void ProcessRecord()
 		{
+			if (ShowWindow.IsPresent && RedirectOutput.IsPresent)
+				throw new ParameterBindingException("The parameters -ShowWindow and -RedirectOutput cannot be used together.");
+
 			if (!ShouldProcess(CommandLine)) return;
 
 			SECURITY_ATTRIBUTES saAttr = new SECURITY_ATTRIBUTES
@@ -92,7 +87,7 @@ namespace PSUserContext.Cmdlets
 			CommandLine = $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle {(ShowWindow ? "Normal" : "Hidden")} -EncodedCommand {encodedCommand}";
 
 			// Retrieve token privileges dictionary
-			var privileges = GetTokenPrivileges();
+			var privileges = TokenExtensions.GetTokenPrivileges();
 
 			// Try to get the specific privilege
 			if (!privileges.TryGetValue("SeDelegateSessionUserImpersonatePrivilege", out var privilegeAttr) ||
@@ -125,12 +120,11 @@ namespace PSUserContext.Cmdlets
 
 			switch (ParameterSetName)
 			{
-				case ByUserDefault:
-				case ByUserVisible:
-					primaryToken = GetSessionUserToken(UserName, false);
+				case ByUser:
+					primaryToken = TokenExtensions.GetSessionUserToken(UserName, false);
 					break;
 				default:
-					primaryToken = GetSessionUserToken(SessionId, false);
+					primaryToken = TokenExtensions.GetSessionUserToken(SessionId, false);
 					break;
 			}
 
@@ -142,13 +136,7 @@ namespace PSUserContext.Cmdlets
 			using (primaryToken)
 			{
 				// Create environment block
-				if (!Userenv.CreateEnvironmentBlock(out SafeEnvironmentBlockHandle environment, primaryToken, false))
-					throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateEnvironmentBlock failed.");
-
-				if (environment == null || environment.IsInvalid)
-					throw new InvalidOperationException("environment handle is invalid");
-
-				using (environment)
+				using (var environment = EnvExtensions.CreateEnvironmentBlock(primaryToken))
 				{
 					WriteVerbose("Envblock handle created");
 

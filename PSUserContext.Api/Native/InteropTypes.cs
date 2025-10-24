@@ -1,8 +1,5 @@
-﻿using Microsoft.Win32.SafeHandles;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace PSUserContext.Api.Native
 {
@@ -20,6 +17,9 @@ namespace PSUserContext.Api.Native
 
 	public static class InteropTypes
 	{
+
+		public const uint INVALID_SESSION_ID = 0xFFFFFFFF;
+
 		/// <summary>
 		/// Flags for handle inheritance and protection
 		/// Corresponds to Win32 HANDLE_FLAGS_* constants

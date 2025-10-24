@@ -1,19 +1,42 @@
-﻿using Microsoft.Win32.SafeHandles;
-using PSUserContext.Api.Helpers;
+﻿using PSUserContext.Api.Helpers;
+using PSUserContext.Api.Models;
 using PSUserContext.Api.Native;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Runtime.InteropServices;
-using System.Security.Principal;
 using System.Text;
-using static PSUserContext.Api.Native.Advapi32;
-using static PSUserContext.Api.Native.Wtsapi32;
 
-namespace PSUserContext.Api.Services
+namespace PSUserContext.Api.Extensions
 {
 	public static class ProcessExtensions
 	{
-		
+		public const uint INFINITE = UInt32.MaxValue;
+
+		public static bool CreateProcessAsUser(
+			SafeHandle hToken,
+			string applicationName,
+			StringBuilder commandLine,
+			IntPtr processAttributes,
+			IntPtr threadAttributes,
+			bool inheritHandles,
+			ProcessCreationFlags creationFlags,
+			SafeEnvironmentBlockHandle environment,
+			string currentDirectory,
+			ref InteropTypes.STARTUPINFO startupInfo,
+			out InteropTypes.PROCESS_INFORMATION processInformation)
+		{
+			bool result = Advapi32.CreateProcessAsUserW(
+				hToken,
+				applicationName,
+				commandLine,
+				processAttributes,
+				threadAttributes,
+				inheritHandles,
+				creationFlags,
+				environment,
+				currentDirectory,
+				ref startupInfo,
+				out processInformation);
+			return result;
+		}
 	}
 }

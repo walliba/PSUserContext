@@ -1,7 +1,6 @@
 ﻿using PSUserContext.Api.Models;
-using PSUserContext.Api.Services;
+using PSUserContext.Api.Extensions;
 using System.Management.Automation;
-using static PSUserContext.Api.Native.Wtsapi32;
 
 namespace PSUserContext.Cmdlets
 {
