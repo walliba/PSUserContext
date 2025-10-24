@@ -1,23 +1,16 @@
-﻿using Microsoft.Win32.SafeHandles;
-using PSUserContext.Api.Helpers;
+﻿using PSUserContext.Api.Helpers;
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Text;
-using static PSUserContext.Api.Native.InteropTypes;
 
 namespace PSUserContext.Api.Native
 {
-	public static class Wtsapi32
+	internal static class Wtsapi32
 	{
-
 		private const string DllName = "wtsapi32.dll";
 
-		public const uint INVALID_SESSION_ID = 0xFFFFFFFF;
+		internal static readonly IntPtr WTS_CURRENT_SERVER_HANDLE = IntPtr.Zero;
 
-		public static readonly IntPtr WTS_CURRENT_SERVER_HANDLE = IntPtr.Zero;
-
-		public enum WTS_INFO_CLASS
+		internal enum WTS_INFO_CLASS
 		{
 			WTSInitialProgram,
 			WTSApplicationName,
@@ -53,7 +46,7 @@ namespace PSUserContext.Api.Native
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly struct WTS_SESSION_INFO
+		internal readonly struct WTS_SESSION_INFO
 		{
 			public readonly uint SessionId;
 			[MarshalAs(UnmanagedType.LPWStr)] public readonly string pWinStationName;
@@ -62,7 +55,7 @@ namespace PSUserContext.Api.Native
 
 		[DllImport(DllName, CharSet = CharSet.Unicode, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
-		public static extern bool WTSEnumerateSessions(
+		internal static extern bool WTSEnumerateSessions(
 			IntPtr hServer,
 			int Reserved,
 			int Version,
@@ -70,17 +63,17 @@ namespace PSUserContext.Api.Native
 			out int pCount);
 
 		[DllImport(DllName, SetLastError = true)]
-		public static extern void WTSFreeMemory(IntPtr pMemory);
+		internal static extern void WTSFreeMemory(IntPtr pMemory);
 
 		[DllImport(DllName, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
-		public static extern bool WTSQueryUserToken(
+		internal static extern bool WTSQueryUserToken(
 			uint SessionId,
 			out SafeNativeHandle phToken);
 
 		[DllImport(DllName, CharSet = CharSet.Unicode, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
-		private static extern bool WTSQuerySessionInformation(
+		internal static extern bool WTSQuerySessionInformation(
 			IntPtr hServer,
 			uint SessionId,
 			WTS_INFO_CLASS WTSInfoClass,

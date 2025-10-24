@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using PSUserContext.Api.Native;
 using static PSUserContext.Api.Native.InteropTypes;
 
-namespace PSUserContext.Api.Services
+namespace PSUserContext.Api.Extensions
 {
 	public static class TokenExtensions
 	{
@@ -134,7 +134,7 @@ namespace PSUserContext.Api.Services
 
 		public static SafeNativeHandle GetSessionUserToken(uint sessionId, bool elevated = false)
 		{
-			if (sessionId == Wtsapi32.INVALID_SESSION_ID)
+			if (sessionId == INVALID_SESSION_ID)
 				sessionId = SessionExtensions.GetActiveConsoleSessionId()
 					?? throw new InvalidOperationException("No active console session found. This typically occurs when no user is logged in.");
 

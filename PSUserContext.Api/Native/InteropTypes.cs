@@ -1,8 +1,5 @@
-﻿using Microsoft.Win32.SafeHandles;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace PSUserContext.Api.Native
 {
@@ -20,6 +17,9 @@ namespace PSUserContext.Api.Native
 
 	public static class InteropTypes
 	{
+
+		public const uint INVALID_SESSION_ID = 0xFFFFFFFF;
+
 		/// <summary>
 		/// Flags for handle inheritance and protection
 		/// Corresponds to Win32 HANDLE_FLAGS_* constants
@@ -54,29 +54,6 @@ namespace PSUserContext.Api.Native
 			TitleIsAppId = 0x00001000,          // STARTF_TITLEISAPPID
 			PreventPinning = 0x00002000,        // STARTF_PREVENTPINNING
 			UntrustedSource = 0x00008000,       // STARTF_UNTRUSTEDSOURCE
-		}
-
-		/// <summary>
-		/// Flags controlling process creation behavior.
-		/// Corresponds to CREATE_* constants.
-		/// </summary>
-		[Flags]
-		public enum ProcessCreationFlags : uint
-		{
-			None = 0x00000000,
-			DebugProcess = 0x00000001,                // DEBUG_PROCESS
-			DebugOnlyThisProcess = 0x00000002,        // DEBUG_ONLY_THIS_PROCESS
-			CreateSuspended = 0x00000004,             // CREATE_SUSPENDED
-			CreateNewConsole = 0x00000010,            // CREATE_NEW_CONSOLE
-			CreateNewProcessGroup = 0x00000200,       // CREATE_NEW_PROCESS_GROUP
-			CreateUnicodeEnvironment = 0x00000400,    // CREATE_UNICODE_ENVIRONMENT
-			CreateSeparateWowVdm = 0x00000800,        // CREATE_SEPARATE_WOW_VDM
-			CreateSharedWowVdm = 0x00001000,          // CREATE_SHARED_WOW_VDM
-			CreateProtectedProcess = 0x00040000,      // CREATE_PROTECTED_PROCESS
-			CreateBreakawayFromJob = 0x01000000,      // CREATE_BREAKAWAY_FROM_JOB
-			CreatePreserveCodeAuthzLevel = 0x02000000,// CREATE_PRESERVE_CODE_AUTHZ_LEVEL
-			CreateDefaultErrorMode = 0x04000000,      // CREATE_DEFAULT_ERROR_MODE
-			CreateNoWindow = 0x08000000,              // CREATE_NO_WINDOW
 		}
 
 		public enum TOKEN_INFORMATION_CLASS

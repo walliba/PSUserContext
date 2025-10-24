@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static PSUserContext.Api.Native.Wtsapi32;
 
-namespace PSUserContext.Api.Services
+namespace PSUserContext.Api.Extensions
 {
 	public static class SessionExtensions
 	{
@@ -17,7 +17,7 @@ namespace PSUserContext.Api.Services
 		{
 			uint sessionId = Kernel32.WTSGetActiveConsoleSessionId();
 
-			if (sessionId == INVALID_SESSION_ID)
+			if (sessionId == InteropTypes.INVALID_SESSION_ID)
 				return null;
 
 			return sessionId;
