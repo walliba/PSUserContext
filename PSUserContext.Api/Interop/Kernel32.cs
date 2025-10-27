@@ -9,7 +9,10 @@ namespace PSUserContext.Api.Interop
 	internal static class Kernel32
 	{
 		private const string DllName = "kernel32.dll";
-
+		
+		[DllImport(DllName, SetLastError = true)]
+		internal static extern bool GetExitCodeProcess(IntPtr hProcess, out uint exitCode);
+		
 		[DllImport(DllName, SetLastError = true)]
 		internal static extern uint WaitForSingleObject(
 			IntPtr hHandle,

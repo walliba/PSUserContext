@@ -99,10 +99,13 @@ public static class ProcessExtensions
         private StreamReader? _stdErrReader;
 
         public uint ProcessId { get; init; }
+        
+        public uint ExitCode { get; init; }
 
-        public UserProcessResult(uint processId, SafeFileHandle stdOut, SafeFileHandle stdErr)
+        public UserProcessResult(uint processId, uint exitCode, SafeFileHandle stdOut, SafeFileHandle stdErr)
         {
             ProcessId = processId;
+            ExitCode = exitCode;
             _stdOutHandle = stdOut;
             _stdErrHandle = stdErr;
         }
@@ -163,7 +166,9 @@ public static class ProcessExtensions
 
         if (options.Redirect != RedirectFlags.None)
             dwCreationFlags |= ProcessCreationFlags.CreateNewConsole;
-
+        
+        uint exitCode;
+        
         using (var environment = EnvExtensions.CreateEnvironmentBlock(userToken))
         {
             if (!Advapi32.CreateProcessAsUserW(
@@ -186,6 +191,7 @@ public static class ProcessExtensions
             try
             {
                 Kernel32.WaitForSingleObject(processInfo.hProcess, INFINITE);
+                Kernel32.GetExitCodeProcess(processInfo.hProcess, out exitCode);
             }
             finally
             {
@@ -193,11 +199,10 @@ public static class ProcessExtensions
                 Kernel32.CloseHandle(processInfo.hProcess);
             }
         }
-
+        
         if (options.Redirect == RedirectFlags.None)
-            return new UserProcessResult(processInfo.dwProcessId, new SafeFileHandle(IntPtr.Zero, true),
-                new SafeFileHandle(IntPtr.Zero, true));
+            return new UserProcessResult(processInfo.dwProcessId, exitCode, new SafeFileHandle(IntPtr.Zero, true), new SafeFileHandle(IntPtr.Zero, true));
 
-        return new UserProcessResult(processInfo.dwProcessId, outRead, errRead);
+        return new UserProcessResult(processInfo.dwProcessId, exitCode, outRead, errRead);
     }
 }

@@ -45,7 +45,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
     public FileInfo FilePath { get; set; }
     
-    // todo: support arguments
     [Parameter(Position = 2)]
     [Alias("Args")]
     public string[] Arguments { get; set; } = Array.Empty<string>();
@@ -138,6 +137,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                     {
                         ProcessId = result.ProcessId,
                         SessionId = SessionId,
+                        ExitCode = result.ExitCode,
                         CommandLine = sbCommand.ToString(),
                         StandardOutput = result.StandardOutput?.ReadToEnd() ?? string.Empty,
                         StandardError = result.StandardError?.ReadToEnd() ?? string.Empty
@@ -146,6 +146,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                     WriteObject(new UserProcessResult
                     {
                         ProcessId = result.ProcessId,
+                        ExitCode = result.ExitCode,
                         SessionId = SessionId,
                         CommandLine = sbCommand.ToString()
                     });
@@ -158,6 +159,7 @@ public class UserProcessResult
 {
     public uint   ProcessId   { get; set; }
     public uint   SessionId   { get; set; }
+    public uint    ExitCode    { get; set; }
     public string CommandLine { get; set; } = string.Empty;
 
     public override string ToString()
