@@ -37,7 +37,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
     [Parameter(Mandatory = true, ParameterSetName = ByUserCommand)]
     [Parameter(Mandatory = true, ParameterSetName = ByIdCommand)]
-    public string Command { get; set; } = string.Empty;
+    public ScriptBlock Command { get; set; }
     
     [Parameter(Mandatory = true, ParameterSetName = ByUserFile)]
     [Parameter(Mandatory = true, ParameterSetName = ByIdFile)]
@@ -46,6 +46,9 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     public FileInfo FilePath { get; set; }
     
     // todo: support arguments
+    [Parameter(Position = 2)]
+    [Alias("Args")]
+    public string[] Arguments { get; set; } = Array.Empty<string>();
     
     // Attempting to specify -RedirectOutput together with -ShowWindow will result in a parameter binding error.
     [Parameter] 
@@ -73,7 +76,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     }
     protected override void ProcessRecord()
     {
-        if (!ShouldProcess(Command)) return;
+        if (!ShouldProcess("Command")) return;
 
         StringBuilder sbCommand =
             new StringBuilder(
@@ -82,14 +85,30 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         if (ParameterSetName.Equals(ByUserFile) || ParameterSetName.Equals(ByIdFile))
         {
             // Should probably copy to session's temp, ensuring the user has access to the file.
-            sbCommand.Append(" -File \"{FilePath.FullName}\"");
+            sbCommand.Append($" -File \"{FilePath.FullName}\"");
+            
+            if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
+            {
+                var arguments = string.Join(" ", Arguments);
+                sbCommand.Append($" {arguments}");
+            }
         }
         else
         {
-            var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(Command));
-            sbCommand.Append($" -EncodedCommand {encodedCommand}");   
+            var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(Command.ToString()));
+            sbCommand.Append($" -EncodedCommand {encodedCommand}");
+            
+            if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
+            {
+                var arguments =
+                    Convert.ToBase64String(
+                        Encoding.Unicode.GetBytes(
+                            PSSerializer.Serialize(Arguments))
+                            );
+                sbCommand.Append($" -EncodedArguments {arguments}");
+            }
         }
-
+        
         var primaryToken = ParameterSetName switch
         {
             ByUserFile or ByUserCommand => TokenExtensions.GetSessionUserToken(UserName, false),
