@@ -11,7 +11,7 @@ namespace PSUserContext.Cmdlets
 {
 	[Cmdlet(VerbsCommon.Get,"UserContext", DefaultParameterSetName = "ById")]
 	[OutputType(typeof(WtsSessionInfo))]
-	[OutputType(typeof(Dictionary<string, string>))]
+	[OutputType(typeof(ErrorRecord))]
 	public sealed class GetUserContextCommand : PSCmdlet
 	{
 		private const string ById = "ById";

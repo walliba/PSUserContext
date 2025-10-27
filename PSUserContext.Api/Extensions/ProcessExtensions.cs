@@ -1,203 +1,203 @@
 ﻿using PSUserContext.Api.Helpers;
-using PSUserContext.Api.Models;
 using PSUserContext.Api.Interop;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
-namespace PSUserContext.Api.Extensions
+namespace PSUserContext.Api.Extensions;
+
+public static class ProcessExtensions
 {
-	public static class ProcessExtensions
-	{
-		/// <summary>
-		/// Flags for handle inheritance and protection
-		/// Corresponds to Win32 HANDLE_FLAGS_* constants
-		/// </summary>
-		[Flags]
-		public enum HandleFlags : uint
-		{
-			None             = 0x00000000,
-			Inherit          = 0x00000001, // HANDLE_FLAG_INHERIT
-			ProtectFromClose = 0x00000002, // HANDLE_FLAG_PROTECT_FROM_CLOSE
-		}
-		/// <summary>
-		/// Flags for STARTUPINFO structure.
-		/// Corresponds to Win32 STARTF_* constants
-		/// </summary>
-		[Flags]
-		public enum StartupInfoFlags : uint
-		{
-			None             = 0x00000000,
-			UseShowWindow    = 0x00000001,  // STARTF_USESHOWWINDOW
-			UseSize          = 0x00000002,	// STARTF_USESIZE
-			UsePosition      = 0x00000004,  // STARTF_USEPOSITION
-			UseCountChars    = 0x00000008,  // STARTF_USECOUNTCHARS
-			UseFillAttribute = 0x00000010,  // STARTF_USEFILLATTRIBUTE
-			RunFullScreen    = 0x00000020,  // STARTF_RUNFULLSCREEN
-			ForceOnFeedback  = 0x00000040,  // STARTF_FORCEONFEEDBACK
-			ForceOffFeedback = 0x00000080,	// STARTF_FORCEOFFFEEDBACK
-			UseStdHandles    = 0x00000100,  // STARTF_USESTDHANDLES
-			UseHotKey        = 0x00000200,	// STARTF_USEHOTKEY
-			TitleIsLinkName  = 0x00000800,  // STARTF_TITLEISLINKNAME
-			TitleIsAppId     = 0x00001000,	// STARTF_TITLEISAPPID
-			PreventPinning   = 0x00002000,  // STARTF_PREVENTPINNING
-			UntrustedSource  = 0x00008000,  // STARTF_UNTRUSTEDSOURCE
-		}
+    /// <summary>
+    /// Flags for handle inheritance and protection
+    /// Corresponds to Win32 HANDLE_FLAGS_* constants
+    /// </summary>
+    [Flags]
+    public enum HandleFlags : uint
+    {
+        None             = 0x00000000,
+        Inherit          = 0x00000001, // HANDLE_FLAG_INHERIT
+        ProtectFromClose = 0x00000002  // HANDLE_FLAG_PROTECT_FROM_CLOSE
+    }
 
-		/// <summary>
-		/// Flags controlling process creation behavior.
-		/// Corresponds to CREATE_* constants.
-		/// </summary>
-		[Flags]
-		public enum ProcessCreationFlags : uint
-		{
-			None = 0x00000000,
-			DebugProcess = 0x00000001,                // DEBUG_PROCESS
-			DebugOnlyThisProcess = 0x00000002,        // DEBUG_ONLY_THIS_PROCESS
-			CreateSuspended = 0x00000004,             // CREATE_SUSPENDED
-			CreateNewConsole = 0x00000010,            // CREATE_NEW_CONSOLE
-			CreateNewProcessGroup = 0x00000200,       // CREATE_NEW_PROCESS_GROUP
-			CreateUnicodeEnvironment = 0x00000400,    // CREATE_UNICODE_ENVIRONMENT
-			CreateSeparateWowVdm = 0x00000800,        // CREATE_SEPARATE_WOW_VDM
-			CreateSharedWowVdm = 0x00001000,          // CREATE_SHARED_WOW_VDM
-			CreateProtectedProcess = 0x00040000,      // CREATE_PROTECTED_PROCESS
-			CreateBreakawayFromJob = 0x01000000,      // CREATE_BREAKAWAY_FROM_JOB
-			CreatePreserveCodeAuthzLevel = 0x02000000,// CREATE_PRESERVE_CODE_AUTHZ_LEVEL
-			CreateDefaultErrorMode = 0x04000000,      // CREATE_DEFAULT_ERROR_MODE
-			CreateNoWindow = 0x08000000,              // CREATE_NO_WINDOW
-		}
+    /// <summary>
+    /// Flags for STARTUPINFO structure.
+    /// Corresponds to Win32 STARTF_* constants
+    /// </summary>
+    [Flags]
+    public enum StartupInfoFlags : uint
+    {
+        None             = 0x00000000,
+        UseShowWindow    = 0x00000001, // STARTF_USESHOWWINDOW
+        UseSize          = 0x00000002, // STARTF_USESIZE
+        UsePosition      = 0x00000004, // STARTF_USEPOSITION
+        UseCountChars    = 0x00000008, // STARTF_USECOUNTCHARS
+        UseFillAttribute = 0x00000010, // STARTF_USEFILLATTRIBUTE
+        RunFullScreen    = 0x00000020, // STARTF_RUNFULLSCREEN
+        ForceOnFeedback  = 0x00000040, // STARTF_FORCEONFEEDBACK
+        ForceOffFeedback = 0x00000080, // STARTF_FORCEOFFFEEDBACK
+        UseStdHandles    = 0x00000100, // STARTF_USESTDHANDLES
+        UseHotKey        = 0x00000200, // STARTF_USEHOTKEY
+        TitleIsLinkName  = 0x00000800, // STARTF_TITLEISLINKNAME
+        TitleIsAppId     = 0x00001000, // STARTF_TITLEISAPPID
+        PreventPinning   = 0x00002000, // STARTF_PREVENTPINNING
+        UntrustedSource  = 0x00008000  // STARTF_UNTRUSTEDSOURCE
+    }
 
-		public const uint INFINITE = UInt32.MaxValue;
-		
-		[Flags]
-		public enum RedirectFlags
-		{
-			None = 0,
-			Input,
-			Output,
-			Error
-		}
-		
-		// todo: refine options
-		public sealed class ProcessOptions
-		{
-			public string? ApplicationName;
-			public StringBuilder? CommandLine;
-			public string WorkingDirectory = @"C:\Windows\System32";
-			public InteropTypes.SW WindowStyle;
-			public RedirectFlags Redirect = RedirectFlags.None;
-			
-		}
+    /// <summary>
+    /// Flags controlling process creation behavior.
+    /// Corresponds to CREATE_* constants.
+    /// </summary>
+    [Flags]
+    public enum ProcessCreationFlags : uint
+    {
+        None                         = 0x00000000,
+        DebugProcess                 = 0x00000001, // DEBUG_PROCESS
+        DebugOnlyThisProcess         = 0x00000002, // DEBUG_ONLY_THIS_PROCESS
+        CreateSuspended              = 0x00000004, // CREATE_SUSPENDED
+        CreateNewConsole             = 0x00000010, // CREATE_NEW_CONSOLE
+        CreateNewProcessGroup        = 0x00000200, // CREATE_NEW_PROCESS_GROUP
+        CreateUnicodeEnvironment     = 0x00000400, // CREATE_UNICODE_ENVIRONMENT
+        CreateSeparateWowVdm         = 0x00000800, // CREATE_SEPARATE_WOW_VDM
+        CreateSharedWowVdm           = 0x00001000, // CREATE_SHARED_WOW_VDM
+        CreateProtectedProcess       = 0x00040000, // CREATE_PROTECTED_PROCESS
+        CreateBreakawayFromJob       = 0x01000000, // CREATE_BREAKAWAY_FROM_JOB
+        CreatePreserveCodeAuthzLevel = 0x02000000, // CREATE_PRESERVE_CODE_AUTHZ_LEVEL
+        CreateDefaultErrorMode       = 0x04000000, // CREATE_DEFAULT_ERROR_MODE
+        CreateNoWindow               = 0x08000000  // CREATE_NO_WINDOW
+    }
 
-		public sealed class UserProcessResult : IDisposable
-		{
-			private SafeFileHandle _stdOutHandle;
-			private SafeFileHandle _stdErrHandle;
+    public const uint INFINITE = uint.MaxValue;
 
-			private StreamReader? _stdOutReader;
-			private StreamReader? _stdErrReader;
-			
-			public uint ProcessId { get; init; }
-			public UserProcessResult(uint processId, SafeFileHandle stdOut, SafeFileHandle stdErr)
-			{
-				ProcessId = processId;
-				_stdOutHandle = stdOut;
-				_stdErrHandle = stdErr;
-			}
-			
-			public StreamReader? StandardOutput =>
-				_stdOutReader ??= _stdOutHandle.IsInvalid || _stdOutHandle.IsClosed ? null :
-					new StreamReader(new FileStream(_stdOutHandle, FileAccess.Read, 4096, false), Encoding.Default);
-			
-			public StreamReader? StandardError =>
-				_stdErrReader ??= _stdErrHandle.IsInvalid || _stdErrHandle.IsClosed ? null :
-					new StreamReader(new FileStream(_stdErrHandle, FileAccess.Read, 4096, false), Encoding.Default);
-			public void Dispose()
-			{
-				_stdOutReader?.Dispose();
-				_stdErrReader?.Dispose();
-				_stdOutHandle.Dispose();
-				_stdErrHandle.Dispose();
-			}
-		}
-		
-		public static UserProcessResult CreateProcessAsUser(SafeNativeHandle userToken, ProcessOptions options)
-		{
-			var securityAttribute = new InteropTypes.SECURITY_ATTRIBUTES
-			{
-				nLength = (uint)Marshal.SizeOf<InteropTypes.SECURITY_ATTRIBUTES>(),
-				bInheritHandle = true,
-				lpSecurityDescriptor = IntPtr.Zero,
-			};
-			
-			if (!Kernel32.CreatePipe(out var outRead, out var outWrite, ref securityAttribute, 0))
-				throw new InvalidOperationException("failed to create output pipe");
-			if (!Kernel32.CreatePipe(out var errRead, out var errWrite, ref securityAttribute, 0))
-				throw new InvalidOperationException("failed to create error pipe");
-			if (!Kernel32.SetHandleInformation(outRead, (uint)HandleFlags.Inherit, 0))
-				throw new InvalidOperationException("failed to set out read handle info");
-			if (!Kernel32.SetHandleInformation(errRead, (uint)HandleFlags.Inherit, 0))
-				throw new InvalidOperationException("failed to set err read handle info");
-			if (!Kernel32.SetHandleInformation(outWrite, (uint)HandleFlags.Inherit, (uint)HandleFlags.Inherit))
-				throw new InvalidOperationException("failed to set out write handle info");
-			if (!Kernel32.SetHandleInformation(errWrite, (uint)HandleFlags.Inherit, (uint)HandleFlags.Inherit))
-				throw new InvalidOperationException("failed to set err write handle info");
-			
-			InteropTypes.PROCESS_INFORMATION processInfo;
-			var startupInfo = new InteropTypes.STARTUPINFO
-			{
-				cb = (uint)Marshal.SizeOf<InteropTypes.STARTUPINFO>(),
-				lpDesktop = @"winsta0\default",
-				wShowWindow = options.WindowStyle,
-				dwFlags = StartupInfoFlags.UseStdHandles | StartupInfoFlags.UseShowWindow,
-				hStdOutput = outWrite,
-				hStdError = errWrite,
-			};
-			
-			var dwCreationFlags = ProcessExtensions.ProcessCreationFlags.CreateUnicodeEnvironment;
-			
-			if (options.Redirect != RedirectFlags.None)
-				dwCreationFlags |= ProcessExtensions.ProcessCreationFlags.CreateNewConsole;
-			
-			using (var environment = EnvExtensions.CreateEnvironmentBlock(userToken))
-			{
-				if (!Advapi32.CreateProcessAsUserW(
-					    userToken,
-					    options.ApplicationName,
-					    options.CommandLine,
-					    IntPtr.Zero,
-					    IntPtr.Zero,
-					    (options.Redirect != 0),
-					    (uint)dwCreationFlags,
-					    environment,
-					    options.WorkingDirectory ?? @"C:\Windows\System32",
-					    ref startupInfo,
-					    out processInfo))
-				{
-					throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessAsUser failed");
-				}
-				
-				outWrite?.Dispose();
-				errWrite?.Dispose();
+    [Flags]
+    public enum RedirectFlags
+    {
+        None = 0,
+        Input,
+        Output,
+        Error
+    }
 
-				try
-				{
-					Kernel32.WaitForSingleObject(processInfo.hProcess, INFINITE);
-				}
-				finally
-				{
-					Kernel32.CloseHandle(processInfo.hThread);
-					Kernel32.CloseHandle(processInfo.hProcess);
-				}
-			}
+    // todo: refine options
+    public sealed class ProcessOptions
+    {
+        public string?         ApplicationName;
+        public StringBuilder?  CommandLine;
+        public string?         WorkingDirectory;
+        public InteropTypes.SW WindowStyle;
+        public RedirectFlags   Redirect = RedirectFlags.None;
+    }
 
-			if (options.Redirect == RedirectFlags.None)
-				return new UserProcessResult(processInfo.dwProcessId, new SafeFileHandle(IntPtr.Zero, true), new SafeFileHandle(IntPtr.Zero, true));
-			
-			return new UserProcessResult(processInfo.dwProcessId, outRead, errRead);
-		}
-	}
+    public sealed class UserProcessResult : IDisposable
+    {
+        private SafeFileHandle _stdOutHandle;
+        private SafeFileHandle _stdErrHandle;
+
+        private StreamReader? _stdOutReader;
+        private StreamReader? _stdErrReader;
+
+        public uint ProcessId { get; init; }
+
+        public UserProcessResult(uint processId, SafeFileHandle stdOut, SafeFileHandle stdErr)
+        {
+            ProcessId = processId;
+            _stdOutHandle = stdOut;
+            _stdErrHandle = stdErr;
+        }
+
+        public StreamReader? StandardOutput =>
+            _stdOutReader ??= _stdOutHandle.IsInvalid || _stdOutHandle.IsClosed
+                ? null
+                : new StreamReader(new FileStream(_stdOutHandle, FileAccess.Read, 4096, false), Encoding.Default);
+
+        public StreamReader? StandardError =>
+            _stdErrReader ??= _stdErrHandle.IsInvalid || _stdErrHandle.IsClosed
+                ? null
+                : new StreamReader(new FileStream(_stdErrHandle, FileAccess.Read, 4096, false), Encoding.Default);
+
+        public void Dispose()
+        {
+            _stdOutReader?.Dispose();
+            _stdErrReader?.Dispose();
+            _stdOutHandle.Dispose();
+            _stdErrHandle.Dispose();
+        }
+    }
+
+    public static UserProcessResult CreateProcessAsUser(SafeNativeHandle userToken, ProcessOptions options)
+    {
+        var securityAttribute = new InteropTypes.SECURITY_ATTRIBUTES
+        {
+            nLength = (uint)Marshal.SizeOf<InteropTypes.SECURITY_ATTRIBUTES>(),
+            bInheritHandle = true,
+            lpSecurityDescriptor = IntPtr.Zero
+        };
+
+        if (!Kernel32.CreatePipe(out var outRead, out var outWrite, ref securityAttribute, 0))
+            throw new InvalidOperationException("failed to create output pipe");
+        if (!Kernel32.CreatePipe(out var errRead, out var errWrite, ref securityAttribute, 0))
+            throw new InvalidOperationException("failed to create error pipe");
+        if (!Kernel32.SetHandleInformation(outRead, (uint)HandleFlags.Inherit, 0))
+            throw new InvalidOperationException("failed to set out read handle info");
+        if (!Kernel32.SetHandleInformation(errRead, (uint)HandleFlags.Inherit, 0))
+            throw new InvalidOperationException("failed to set err read handle info");
+        if (!Kernel32.SetHandleInformation(outWrite, (uint)HandleFlags.Inherit, (uint)HandleFlags.Inherit))
+            throw new InvalidOperationException("failed to set out write handle info");
+        if (!Kernel32.SetHandleInformation(errWrite, (uint)HandleFlags.Inherit, (uint)HandleFlags.Inherit))
+            throw new InvalidOperationException("failed to set err write handle info");
+
+        InteropTypes.PROCESS_INFORMATION processInfo;
+        var startupInfo = new InteropTypes.STARTUPINFO
+        {
+            cb = (uint)Marshal.SizeOf<InteropTypes.STARTUPINFO>(),
+            lpDesktop = @"winsta0\default",
+            wShowWindow = options.WindowStyle,
+            dwFlags = StartupInfoFlags.UseStdHandles | StartupInfoFlags.UseShowWindow,
+            hStdOutput = outWrite,
+            hStdError = errWrite
+        };
+
+        var dwCreationFlags = ProcessCreationFlags.CreateUnicodeEnvironment;
+
+        if (options.Redirect != RedirectFlags.None)
+            dwCreationFlags |= ProcessCreationFlags.CreateNewConsole;
+
+        using (var environment = EnvExtensions.CreateEnvironmentBlock(userToken))
+        {
+            if (!Advapi32.CreateProcessAsUserW(
+                    userToken,
+                    options.ApplicationName,
+                    options.CommandLine,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    options.Redirect != 0,
+                    (uint)dwCreationFlags,
+                    environment,
+                    options.WorkingDirectory ?? @"C:\Windows\System32",
+                    ref startupInfo,
+                    out processInfo))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessAsUser failed");
+
+            outWrite?.Dispose();
+            errWrite?.Dispose();
+
+            try
+            {
+                Kernel32.WaitForSingleObject(processInfo.hProcess, INFINITE);
+            }
+            finally
+            {
+                Kernel32.CloseHandle(processInfo.hThread);
+                Kernel32.CloseHandle(processInfo.hProcess);
+            }
+        }
+
+        if (options.Redirect == RedirectFlags.None)
+            return new UserProcessResult(processInfo.dwProcessId, new SafeFileHandle(IntPtr.Zero, true),
+                new SafeFileHandle(IntPtr.Zero, true));
+
+        return new UserProcessResult(processInfo.dwProcessId, outRead, errRead);
+    }
 }

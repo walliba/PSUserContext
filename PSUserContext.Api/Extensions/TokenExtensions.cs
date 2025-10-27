@@ -5,7 +5,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
-using System.Threading.Tasks;
 using PSUserContext.Api.Interop;
 using static PSUserContext.Api.Interop.InteropTypes;
 
@@ -15,13 +14,13 @@ namespace PSUserContext.Api.Extensions
 	{
 		private static TokenElevationType GetTokenElevationType(SafeHandle hToken)
 		{
-			using SafeHGlobalBuffer tokenInfo = GetTokenInformation(hToken, 18);
+			using var tokenInfo = GetTokenInformation(hToken, 18);
 			return (TokenElevationType)Marshal.ReadInt32(tokenInfo.DangerousGetHandle());
 		}
 		private static SafeNativeHandle GetTokenLinkedToken(SafeHandle hToken)
 		{
-			using (SafeHGlobalBuffer tokenInfo = GetTokenInformation(hToken, 19))
-				return new SafeNativeHandle(Marshal.ReadIntPtr(tokenInfo.DangerousGetHandle()));
+			using var tokenInfo = GetTokenInformation(hToken, 19);
+			return new SafeNativeHandle(Marshal.ReadIntPtr(tokenInfo.DangerousGetHandle()));
 		}
 
 		private static SafeHGlobalBuffer GetTokenInformation(SafeHandle hToken, uint infoClass)
@@ -39,7 +38,7 @@ namespace PSUserContext.Api.Extensions
 					infoClass,
 					SafeHGlobalBuffer.Null,  // see helper below
 					0,
-					out uint requiredLength))
+					out var requiredLength))
 			{
 				int error = Marshal.GetLastWin32Error();
 				if (error != ERROR_INSUFFICIENT_BUFFER && error != ERROR_BAD_LENGTH)
@@ -68,7 +67,7 @@ namespace PSUserContext.Api.Extensions
 			}
 		}
 
-		public static SafeNativeHandle DuplicateTokenAsPrimary(SafeHandle hToken)
+		private static SafeNativeHandle DuplicateTokenAsPrimary(SafeHandle hToken)
 		{
 			if (!Advapi32.DuplicateTokenEx(hToken, 0, IntPtr.Zero, SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, InteropTypes.TOKEN_TYPE.TokenPrimary, out SafeNativeHandle pDupToken))
 				throw new Interop.Win32Exception("Failed to duplicate impersonation token as primary");
@@ -103,7 +102,7 @@ namespace PSUserContext.Api.Extensions
 					StringBuilder name = new StringBuilder((int)(nameLen + 1));
 					if (!Advapi32.LookupPrivilegeName(null, ref info.Luid, name, ref nameLen))
 						throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), "LookupPrivilegeName failed");
-
+					
 					privileges[name.ToString()] = info.Attributes;
 
 					// Advance pointer
@@ -112,6 +111,16 @@ namespace PSUserContext.Api.Extensions
 			}
 
 			return privileges;
+		}
+
+		public static bool HasTokenPrivilege(string privilege)
+		{
+			var privileges = GetTokenPrivileges();
+			
+			if (!privileges.TryGetValue(privilege, out var attributes))
+				return false;
+
+			return attributes != PrivilegeAttributes.Disabled;
 		}
 
 		public static SafeNativeHandle GetSessionUserToken(string username, bool elevated = false)
