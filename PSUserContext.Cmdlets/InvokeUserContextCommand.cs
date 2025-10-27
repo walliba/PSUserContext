@@ -138,7 +138,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                         ProcessId = result.ProcessId,
                         SessionId = SessionId,
                         ExitCode = result.ExitCode,
-                        CommandLine = sbCommand.ToString(),
                         StandardOutput = result.StandardOutput?.ReadToEnd() ?? string.Empty,
                         StandardError = result.StandardError?.ReadToEnd() ?? string.Empty
                     });
@@ -146,9 +145,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                     WriteObject(new UserProcessResult
                     {
                         ProcessId = result.ProcessId,
-                        ExitCode = result.ExitCode,
                         SessionId = SessionId,
-                        CommandLine = sbCommand.ToString()
+                        ExitCode = result.ExitCode,
                     });
             }
         }
@@ -160,11 +158,10 @@ public class UserProcessResult
     public uint   ProcessId   { get; set; }
     public uint   SessionId   { get; set; }
     public uint    ExitCode    { get; set; }
-    public string CommandLine { get; set; } = string.Empty;
 
     public override string ToString()
     {
-        return $"PID {ProcessId} (Session {SessionId}): {CommandLine}";
+        return $"PID {ProcessId} (Session {SessionId}): exit code {ExitCode}";
     }
 }
 
