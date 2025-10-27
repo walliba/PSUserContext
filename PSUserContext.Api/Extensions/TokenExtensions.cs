@@ -69,6 +69,8 @@ namespace PSUserContext.Api.Extensions
 
 		private static SafeNativeHandle DuplicateTokenAsPrimary(SafeHandle hToken)
 		{
+			// todo: should I check token privileges here?
+			
 			if (!Advapi32.DuplicateTokenEx(hToken, 0, IntPtr.Zero, SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, InteropTypes.TOKEN_TYPE.TokenPrimary, out SafeNativeHandle pDupToken))
 				throw new Interop.Win32Exception("Failed to duplicate impersonation token as primary");
 

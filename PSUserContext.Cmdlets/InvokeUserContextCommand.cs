@@ -89,18 +89,18 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             
             if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
             {
-                var arguments = string.Join(" ", Arguments);
+                string arguments = string.Join(" ", Arguments);
                 sbCommand.Append($" {arguments}");
             }
         }
         else
         {
-            var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(Command.ToString()));
+            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(Command.ToString()));
             sbCommand.Append($" -EncodedCommand {encodedCommand}");
             
             if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
             {
-                var arguments =
+                string arguments =
                     Convert.ToBase64String(
                         Encoding.Unicode.GetBytes(
                             PSSerializer.Serialize(Arguments))
