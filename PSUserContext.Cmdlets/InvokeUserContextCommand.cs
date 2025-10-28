@@ -43,6 +43,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Alias("Out")] 
     public SwitchParameter RedirectOutput { get; set; }
     
+    // todo: implement PassThru parameter
+    
     [Parameter]
     [Alias("Visible")] 
     public SwitchParameter ShowWindow { get; set; }
