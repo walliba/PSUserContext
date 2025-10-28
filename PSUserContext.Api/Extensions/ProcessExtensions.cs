@@ -4,6 +4,8 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
 namespace PSUserContext.Api.Extensions;
@@ -90,43 +92,40 @@ public static class ProcessExtensions
         public RedirectFlags   Redirect = RedirectFlags.None;
     }
 
-    public sealed class UserProcessResult : IDisposable
+    public sealed class UserProcessResult
     {
-        private SafeFileHandle _stdOutHandle;
-        private SafeFileHandle _stdErrHandle;
-
-        private StreamReader? _stdOutReader;
-        private StreamReader? _stdErrReader;
-
         public uint ProcessId { get; init; }
         
         public uint ExitCode { get; init; }
+        
+        public string StdOutput { get; init; }
+        public string StdError { get; init; }
 
-        public UserProcessResult(uint processId, uint exitCode, SafeFileHandle stdOut, SafeFileHandle stdErr)
+        public UserProcessResult(uint processId, uint exitCode, string? stdOut = null, string? stdErr = null)
         {
             ProcessId = processId;
             ExitCode = exitCode;
-            _stdOutHandle = stdOut;
-            _stdErrHandle = stdErr;
+            StdOutput = stdOut ?? string.Empty;
+            StdError = stdErr ??  string.Empty;
         }
+    }
 
-        public StreamReader? StandardOutput =>
-            _stdOutReader ??= _stdOutHandle.IsInvalid || _stdOutHandle.IsClosed
-                ? null
-                : new StreamReader(new FileStream(_stdOutHandle, FileAccess.Read, 4096, false), Encoding.Default);
-
-        public StreamReader? StandardError =>
-            _stdErrReader ??= _stdErrHandle.IsInvalid || _stdErrHandle.IsClosed
-                ? null
-                : new StreamReader(new FileStream(_stdErrHandle, FileAccess.Read, 4096, false), Encoding.Default);
-
-        public void Dispose()
+    private static Task<string> ReadPipeTask(SafeFileHandle hRead, CancellationToken token = default)
+    {
+        return Task.Run(() =>
         {
-            _stdOutReader?.Dispose();
-            _stdErrReader?.Dispose();
-            _stdOutHandle.Dispose();
-            _stdErrHandle.Dispose();
-        }
+            using var fs = new FileStream(hRead, FileAccess.Read, 4096, false);
+            using var reader = new StreamReader(fs, Encoding.UTF8);
+            var sb = new StringBuilder();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                sb.Append(Encoding.Default.GetString(buffer, 0, bytesRead));
+            }
+
+            return sb.ToString();
+        }, token);
     }
 
     public static UserProcessResult CreateProcessAsUser(SafeNativeHandle userToken, ProcessOptions options)
@@ -138,9 +137,9 @@ public static class ProcessExtensions
             lpSecurityDescriptor = IntPtr.Zero
         };
     
-        if (!Kernel32.CreatePipe(out var outRead, out var outWrite, ref securityAttribute, 65536)) // todo: use async read instead of large pipe buffer
+        if (!Kernel32.CreatePipe(out var outRead, out var outWrite, ref securityAttribute, 0)) // todo: use async read instead of large pipe buffer
             throw new InvalidOperationException("failed to create output pipe");
-        if (!Kernel32.CreatePipe(out var errRead, out var errWrite, ref securityAttribute, 65536)) // todo: use async read instead of large pipe buffer
+        if (!Kernel32.CreatePipe(out var errRead, out var errWrite, ref securityAttribute, 0)) // todo: use async read instead of large pipe buffer
             throw new InvalidOperationException("failed to create error pipe");
         if (!Kernel32.SetHandleInformation(outRead, (uint)HandleFlags.Inherit, 0))
             throw new InvalidOperationException("failed to set out read handle info");
@@ -186,25 +185,28 @@ public static class ProcessExtensions
                     ref startupInfo,
                     out processInfo))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessAsUser failed");
+        }
+        
+        var stdOutTask = ReadPipeTask(outRead);
+        var stdErrTask = ReadPipeTask(errRead);
 
-            outWrite?.Dispose();
-            errWrite?.Dispose();
+        outWrite?.Dispose();
+        errWrite?.Dispose();
 
-            try
-            {
-                Kernel32.WaitForSingleObject(processInfo.hProcess, INFINITE);
-                Kernel32.GetExitCodeProcess(processInfo.hProcess, out exitCode);
-            }
-            finally
-            {
-                Kernel32.CloseHandle(processInfo.hThread);
-                Kernel32.CloseHandle(processInfo.hProcess);
-            }
+        try
+        {
+            Kernel32.WaitForSingleObject(processInfo.hProcess, INFINITE);
+            Kernel32.GetExitCodeProcess(processInfo.hProcess, out exitCode);
+        }
+        finally
+        {
+            Kernel32.CloseHandle(processInfo.hThread);
+            Kernel32.CloseHandle(processInfo.hProcess);
         }
         
         if (options.Redirect == RedirectFlags.None)
-            return new UserProcessResult(processInfo.dwProcessId, exitCode, new SafeFileHandle(IntPtr.Zero, true), new SafeFileHandle(IntPtr.Zero, true));
+            return new UserProcessResult(processInfo.dwProcessId, exitCode);
 
-        return new UserProcessResult(processInfo.dwProcessId, exitCode, outRead, errRead);
+        return new UserProcessResult(processInfo.dwProcessId, exitCode, stdOutTask.GetAwaiter().GetResult(), stdErrTask.GetAwaiter().GetResult());
     }
 }

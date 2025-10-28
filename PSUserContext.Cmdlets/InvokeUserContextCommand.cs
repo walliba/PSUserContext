@@ -122,32 +122,32 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                 ? ProcessExtensions.RedirectFlags.Output | ProcessExtensions.RedirectFlags.Error
                 : ProcessExtensions.RedirectFlags.None;
 
-            using (var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
-                       new ProcessExtensions.ProcessOptions
-                       {
-                           ApplicationName = PowerShellPath,
-                           CommandLine = sbCommand,
-                           Redirect = redirectOptions,
-                           WindowStyle = ShowWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
-                       }))
-            {
-                if (RedirectOutput.IsPresent)
-                    WriteObject(new UserProcessWithOutputResult
-                    {
-                        ProcessId = result.ProcessId,
-                        SessionId = SessionId,
-                        ExitCode = result.ExitCode,
-                        StandardOutput = result.StandardOutput?.ReadToEnd() ?? string.Empty,
-                        StandardError = result.StandardError?.ReadToEnd() ?? string.Empty
-                    });
-                else
-                    WriteObject(new UserProcessResult
-                    {
-                        ProcessId = result.ProcessId,
-                        SessionId = SessionId,
-                        ExitCode = result.ExitCode,
-                    });
-            }
+            var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
+                new ProcessExtensions.ProcessOptions
+                {
+                    ApplicationName = PowerShellPath,
+                    CommandLine = sbCommand,
+                    Redirect = redirectOptions,
+                    WindowStyle = ShowWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
+                });
+            
+            if (RedirectOutput.IsPresent)
+                WriteObject(new UserProcessWithOutputResult
+                {
+                    ProcessId = result.ProcessId,
+                    SessionId = SessionId,
+                    ExitCode = result.ExitCode,
+                    StandardOutput = result.StdOutput,
+                    StandardError = result.StdError
+                });
+            else
+                WriteObject(new UserProcessResult
+                {
+                    ProcessId = result.ProcessId,
+                    SessionId = SessionId,
+                    ExitCode = result.ExitCode,
+                });
+            
         }
     }
 }
