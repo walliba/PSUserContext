@@ -12,8 +12,7 @@
 		<PackageReference Include="System.Security.Principal.Windows" Version="5.0.0" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">
 		<!-- No need to reference System.Security.Principal.Windows explicitly -->
 	</ItemGroup>
-
 </Project>
