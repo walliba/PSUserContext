@@ -14,31 +14,21 @@ namespace PSUserContext.Cmdlets;
 public sealed class InvokeUserContextCommand : PSCmdlet
 {
     private const string ById        = "ById";
-    private const string ByUser      = "ByUser";
     private const string CommandAct  = "+ScriptBlock";
     private const string FileAct     = "+File";
     private const string RedirectAct = "+Redirect";
     private const string VisibleAct  = "+Visible";
     
     private const string ByIdCommand   = ById + CommandAct;
-    private const string ByUserCommand = ByUser + CommandAct;
     private const string ByIdFile      = ById + FileAct;
-    private const string ByUserFile    = ByUser + FileAct;
 
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, ParameterSetName = ByIdCommand)]
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, ParameterSetName = ByIdFile)]
     public uint SessionId { get; set; } = InteropTypes.INVALID_SESSION_ID;
-
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUserCommand)]
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUserFile)]
-    [Alias("Name")]
-    public string UserName { get; set; } = string.Empty;
-
-    [Parameter(Mandatory = true, ParameterSetName = ByUserCommand)]
+    
     [Parameter(Mandatory = true, ParameterSetName = ByIdCommand)]
     public ScriptBlock? ScriptBlock { get; set; }
     
-    [Parameter(Mandatory = true, ParameterSetName = ByUserFile)]
     [Parameter(Mandatory = true, ParameterSetName = ByIdFile)]
     [Alias("File")]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
@@ -80,7 +70,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             new StringBuilder(
                 $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle {(ShowWindow ? "Normal" : "Hidden")}");
         
-        if (ParameterSetName.Equals(ByUserFile) || ParameterSetName.Equals(ByIdFile))
+        if (ParameterSetName.Equals(ByIdFile))
         {
             // Should probably copy to session's temp, ensuring the user has access to the file.
             sbCommand.Append($" -File \"{FilePath.FullName}\"");
@@ -106,12 +96,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                 sbCommand.Append($" -EncodedArguments {arguments}");
             }
         }
-        
-        var primaryToken = ParameterSetName switch
-        {
-            ByUserFile or ByUserCommand => TokenExtensions.GetSessionUserToken(UserName, false),
-            _      => TokenExtensions.GetSessionUserToken(SessionId, false)
-        };
+
+        var primaryToken = TokenExtensions.GetSessionUserToken(SessionId, false);
 
         if (primaryToken == null || primaryToken.IsInvalid)
             throw new InvalidOperationException("Failed to get a valid session user token.");
