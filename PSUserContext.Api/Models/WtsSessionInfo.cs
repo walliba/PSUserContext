@@ -20,10 +20,13 @@ namespace PSUserContext.Api.Models
 		public uint Id { get; init; } = id;
 		public string SessionName { get; init; } = sessionName ?? string.Empty;
 		public WtsSessionState State { get; private set; } = state;
-
+		
+		public static implicit operator uint(WtsSessionInfo sessionInfo)
+			=> sessionInfo.Id;
+		
 		public override string ToString()
 			=> $"{DomainName}\\{UserName} (Session {Id}, {State})";
-
+		
 		public string? GetEnvironmentVariable(string variableName)
 		{
 			return EnvExtensions.GetVariable(this.Id, variableName);

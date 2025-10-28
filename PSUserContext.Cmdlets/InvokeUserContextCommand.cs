@@ -25,9 +25,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     private const string ByIdFile      = ById + FileAct;
     private const string ByUserFile    = ByUser + FileAct;
 
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdCommand)]
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdFile)]
-    [Alias("Id")]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, ParameterSetName = ByIdCommand)]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, ParameterSetName = ByIdFile)]
     public uint SessionId { get; set; } = InteropTypes.INVALID_SESSION_ID;
 
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByUserCommand)]
