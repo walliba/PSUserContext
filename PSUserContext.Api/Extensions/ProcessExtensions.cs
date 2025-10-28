@@ -163,7 +163,7 @@ public static class ProcessExtensions
 
         var dwCreationFlags = ProcessCreationFlags.CreateUnicodeEnvironment;
 
-        if (options.Redirect != RedirectFlags.None)
+        if (options.Redirect == RedirectFlags.None)
             dwCreationFlags |= ProcessCreationFlags.CreateNewConsole;
         
         uint exitCode;
