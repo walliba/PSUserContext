@@ -8,14 +8,14 @@ using PSUserContext.Cmdlets.Completers;
 
 namespace PSUserContext.Cmdlets;
 
-[Cmdlet(VerbsLifecycle.Invoke, "UserContext", DefaultParameterSetName = "ById+Command", SupportsShouldProcess = true)]
+[Cmdlet(VerbsLifecycle.Invoke, "UserContext", DefaultParameterSetName = "ById+ScriptBlock", SupportsShouldProcess = true)]
 [OutputType(typeof(UserProcessResult))]
 [OutputType(typeof(UserProcessWithOutputResult))]
 public sealed class InvokeUserContextCommand : PSCmdlet
 {
     private const string ById        = "ById";
     private const string ByUser      = "ByUser";
-    private const string CommandAct  = "+Command";
+    private const string CommandAct  = "+ScriptBlock";
     private const string FileAct     = "+File";
     private const string RedirectAct = "+Redirect";
     private const string VisibleAct  = "+Visible";
@@ -37,7 +37,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
     [Parameter(Mandatory = true, ParameterSetName = ByUserCommand)]
     [Parameter(Mandatory = true, ParameterSetName = ByIdCommand)]
-    public ScriptBlock Command { get; set; }
+    public ScriptBlock? ScriptBlock { get; set; }
     
     [Parameter(Mandatory = true, ParameterSetName = ByUserFile)]
     [Parameter(Mandatory = true, ParameterSetName = ByIdFile)]
@@ -75,7 +75,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     }
     protected override void ProcessRecord()
     {
-        if (!ShouldProcess("Command")) return;
+        if (!ShouldProcess("ScriptBlock")) return;
 
         StringBuilder sbCommand =
             new StringBuilder(
@@ -94,7 +94,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         }
         else
         {
-            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(Command.ToString()));
+            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(ScriptBlock!.ToString()));
             sbCommand.Append($" -EncodedCommand {encodedCommand}");
             
             if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
