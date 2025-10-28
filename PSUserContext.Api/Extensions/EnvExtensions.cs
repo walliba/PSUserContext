@@ -22,7 +22,7 @@ namespace PSUserContext.Api.Extensions
 			return environment;
 		}
 
-		private static string? LatentGetVariable(this SafeEnvironmentBlockHandle? env, string key)
+		internal static string? LatentGetVariable(this SafeEnvironmentBlockHandle? env, string key)
 		{
 			if (env is null || env.IsInvalid)
 				throw new ObjectDisposedException(nameof(env));

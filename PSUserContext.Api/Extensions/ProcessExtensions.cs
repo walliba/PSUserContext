@@ -171,6 +171,8 @@ public static class ProcessExtensions
         
         using (var environment = EnvExtensions.CreateEnvironmentBlock(userToken))
         {
+            string? userProfilePath = environment.LatentGetVariable("USERPROFILE") ?? @"C:\Windows\System32";
+            
             if (!Advapi32.CreateProcessAsUserW(
                     userToken,
                     options.ApplicationName,
@@ -180,7 +182,7 @@ public static class ProcessExtensions
                     options.Redirect != 0,
                     (uint)dwCreationFlags,
                     environment,
-                    options.WorkingDirectory ?? @"C:\Windows\System32",
+                    options.WorkingDirectory ?? userProfilePath,
                     ref startupInfo,
                     out processInfo))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessAsUser failed");
