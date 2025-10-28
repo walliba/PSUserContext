@@ -137,10 +137,10 @@ public static class ProcessExtensions
             bInheritHandle = true,
             lpSecurityDescriptor = IntPtr.Zero
         };
-
-        if (!Kernel32.CreatePipe(out var outRead, out var outWrite, ref securityAttribute, 0))
+    
+        if (!Kernel32.CreatePipe(out var outRead, out var outWrite, ref securityAttribute, 65536)) // todo: use async read instead of large pipe buffer
             throw new InvalidOperationException("failed to create output pipe");
-        if (!Kernel32.CreatePipe(out var errRead, out var errWrite, ref securityAttribute, 0))
+        if (!Kernel32.CreatePipe(out var errRead, out var errWrite, ref securityAttribute, 65536)) // todo: use async read instead of large pipe buffer
             throw new InvalidOperationException("failed to create error pipe");
         if (!Kernel32.SetHandleInformation(outRead, (uint)HandleFlags.Inherit, 0))
             throw new InvalidOperationException("failed to set out read handle info");
