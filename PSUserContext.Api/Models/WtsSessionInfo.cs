@@ -8,18 +8,13 @@ using static PSUserContext.Api.Interop.Wtsapi32;
 
 namespace PSUserContext.Api.Models
 {
-	public class WtsSessionInfo(
-		uint id,
-		string? userName,
-		string? domainName,
-		string? sessionName,
-		WtsSessionState state)
+	public class WtsSessionInfo
 	{
-		public string DomainName { get; init; } = domainName ?? string.Empty;
-		public string UserName { get; init; } = userName ?? string.Empty;
-		public uint Id { get; init; } = id;
-		public string SessionName { get; init; } = sessionName ?? string.Empty;
-		public WtsSessionState State { get; private set; } = state;
+		public string? DomainName { get; init; }
+		public string? UserName { get; init; }
+		public required uint Id { get; init; }
+		public string? SessionName { get; init; }
+		public required WtsSessionState State { get; init; }
 		
 		public static implicit operator uint(WtsSessionInfo sessionInfo)
 			=> sessionInfo.Id;
