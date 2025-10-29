@@ -2,9 +2,11 @@
 using System;
 using System.IO;
 using System.Management.Automation;
+using System.Runtime.Serialization;
 using System.Text;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
+using PSUserContext.Cmdlets.Helpers;
 
 namespace PSUserContext.Cmdlets;
 
@@ -43,7 +45,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Alias("Out")] 
     public SwitchParameter RedirectOutput { get; set; }
     
-    // todo: implement PassThru parameter
+    [Parameter]
+    public SwitchParameter PassThru { get; set; }
     
     [Parameter]
     [Alias("Visible")] 
@@ -70,7 +73,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         StringBuilder sbCommand =
             new StringBuilder(
-                $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle {(ShowWindow ? "Normal" : "Hidden")}");
+                $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -OutputFormat XML -WindowStyle {(ShowWindow ? "Normal" : "Hidden")}");
         
         if (ParameterSetName.Equals(ByIdFile))
         {
@@ -118,24 +121,44 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                     Redirect = redirectOptions,
                     WindowStyle = ShowWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
                 });
+
+            var output = CliXml.DeserializeCliXml(result.StdOutput);
+            var error = CliXml.DeserializeCliXml(result.StdError);
             
-            if (RedirectOutput.IsPresent)
-                WriteObject(new UserProcessWithOutputResult
-                {
-                    ProcessId = result.ProcessId,
-                    SessionId = SessionId,
-                    ExitCode = result.ExitCode,
-                    StandardOutput = result.StdOutput,
-                    StandardError = result.StdError
-                });
-            else
-                WriteObject(new UserProcessResult
-                {
-                    ProcessId = result.ProcessId,
-                    SessionId = SessionId,
-                    ExitCode = result.ExitCode,
-                });
+            if (output is not null)
+                foreach (var o in output)
+                    WriteObject(output);
             
+            if (error is not null)
+            {
+                foreach (var obj in error)
+                {
+                    var err = CliXml.HydrateErrorRecord(obj);
+                    if (err is not null)
+                        WriteError(err);
+                }
+                
+            }
+
+            if (PassThru.IsPresent)
+            {
+                if (RedirectOutput.IsPresent)
+                    WriteObject(new UserProcessWithOutputResult
+                    {
+                        ProcessId = result.ProcessId,
+                        SessionId = SessionId,
+                        ExitCode = result.ExitCode,
+                        StandardOutput = result.StdOutput.ToString(),
+                        StandardError = result.StdError.ToString()
+                    });
+                else
+                    WriteObject(new UserProcessResult
+                    {
+                        ProcessId = result.ProcessId,
+                        SessionId = SessionId,
+                        ExitCode = result.ExitCode,
+                    });
+            }
         }
     }
 }
