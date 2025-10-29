@@ -4,6 +4,7 @@ using System.IO;
 using System.Management.Automation;
 using System.Runtime.Serialization;
 using System.Text;
+using System.Threading;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
 using PSUserContext.Cmdlets.Helpers;
@@ -70,7 +71,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     protected override void ProcessRecord()
     {
         if (!ShouldProcess("ScriptBlock")) return;
-
+        
         StringBuilder sbCommand =
             new StringBuilder(
                 $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -OutputFormat XML -WindowStyle {(ShowWindow ? "Normal" : "Hidden")}");
@@ -123,19 +124,22 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                 });
 
             var output = CliXml.DeserializeCliXml(result.StdOutput);
-            var error = CliXml.DeserializeCliXml(result.StdError);
+            var errObj = CliXml.DeserializeCliXml(result.StdError);
+            var error = CliXml.DeserializeCliXmlError(result.StdError);
             
             if (output is not null)
                 foreach (var o in output)
-                    WriteObject(output);
+                    WriteObject(o);
+            
+            if (errObj is not null)
+                foreach (var o in errObj)
+                    WriteObject(errObj);
             
             if (error is not null)
             {
-                foreach (var obj in error)
+                foreach (var o in error)
                 {
-                    var err = CliXml.HydrateErrorRecord(obj);
-                    if (err is not null)
-                        WriteError(err);
+                    WriteError(o);
                 }
                 
             }
