@@ -147,7 +147,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             {
                 foreach (var o in error)
                 {
-                    _propertyInfo?.SetValue(o, true);
+                    // _propertyInfo?.SetValue(o, true);
                     WriteError(o);
                 }
                 
