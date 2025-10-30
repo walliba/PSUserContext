@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Management.Automation;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
@@ -55,6 +56,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
     private const string RequiredPrivilege = "SeDelegateSessionUserImpersonatePrivilege";
     private const string PowerShellPath    = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
+
+    private PropertyInfo? _propertyInfo;
     
     protected override void BeginProcessing()
     {   
@@ -66,6 +69,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         if (!TokenExtensions.HasTokenPrivilege(RequiredPrivilege))
             throw new InvalidOperationException(
                 "Missing required privilege. You must run this script as SYSTEM or have the SeDelegateSessionUserImpersonatePrivilege token.");
+        
+        _propertyInfo = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce", BindingFlags.NonPublic | BindingFlags.Instance);
 
     }
     protected override void ProcessRecord()
@@ -133,12 +138,16 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             
             if (errObj is not null)
                 foreach (var o in errObj)
-                    WriteObject(errObj);
+                {
+                    WriteObject(o);
+                }
+                    
             
             if (error is not null)
             {
                 foreach (var o in error)
                 {
+                    _propertyInfo?.SetValue(o, true);
                     WriteError(o);
                 }
                 

@@ -1,9 +1,11 @@
 using System;
+using System.ComponentModel;
 using System.Management.Automation;
 
 namespace PSUserContext.Cmdlets.Converters;
 
-public class ErrorRecordConverter : PSTypeConverter
+[TypeConverter]
+public class PsObjectConverter : PSTypeConverter
 {
     public override bool CanConvertFrom(object sourceValue, Type destinationType)
     {

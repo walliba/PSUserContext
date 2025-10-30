@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Remoting;
+using System.Management.Automation.Remoting.Internal;
+using System.Reflection;
 using System.Text;
 
 namespace PSUserContext.Cmdlets.Helpers;
@@ -9,7 +11,44 @@ namespace PSUserContext.Cmdlets.Helpers;
 public static class CliXml
 {
     private const string LineStart = "#< CLIXML";
+    
+    private static ErrorRecord? RehydrateErrorRecordViaReflection(PSObject ps)
+    {
+        var msg = ps.Properties["Message"]?.Value?.ToString()
+                  ?? "Remote error (no message)";
+        var fqid = ps.Properties["FullyQualifiedErrorId"]?.Value?.ToString()
+                   ?? "RemoteError";
+        var target = ps.Properties["TargetObject"]?.Value;
+        var category = ErrorCategory.NotSpecified;
 
+        if (ps.Properties["CategoryInfo"]?.Value is PSObject cat)
+        {
+            var catName = cat.Properties["Category"]?.Value?.ToString();
+            Enum.TryParse(catName, out category);
+        }
+
+        // Create Exception
+        var exTypeName = ps.Properties["ExceptionTypeName"]?.Value?.ToString()
+                         ?? "System.Management.Automation.RemoteException";
+        var exType = Type.GetType(exTypeName) ?? typeof(RemoteException);
+        var ex = (Exception)(Activator.CreateInstance(exType, msg) ?? new RemoteException(msg));
+
+        // Use reflection to create an ErrorRecord instance
+        var ctor = typeof(ErrorRecord).GetConstructor(
+            BindingFlags.Instance | BindingFlags.Public,
+            null,
+            new[] { typeof(Exception), typeof(string), typeof(ErrorCategory), typeof(object) },
+            null);
+
+        var er = (ErrorRecord?)ctor?.Invoke(new object[] { ex, fqid, category, target });
+
+        // Optional: use reflection to set PreserveInvocationInfoOnce if you want the remote InvocationInfo preserved
+        var preserveProp = typeof(ErrorRecord)
+            .GetProperty("PreserveInvocationInfoOnce", BindingFlags.Instance | BindingFlags.NonPublic);
+        preserveProp?.SetValue(er, true);
+
+        return er;
+    }
     public static Exception CreateDynamicException(string typeName, string message)
     {
         // Try to resolve type name from any loaded assembly
@@ -68,7 +107,7 @@ public static class CliXml
                     category = (ErrorCategory)ec;
                 }
                 
-                var err = new ErrorRecord(ex ?? new RemoteException("Unknown error"),
+                ErrorRecord err = new ErrorRecord(ex ?? new RemoteException("Unknown error"),
                                           fqid,
                                           category,
                                           target);
@@ -77,8 +116,7 @@ public static class CliXml
                                  .Properties["Message"]?.Value?.ToString();
                 if (!string.IsNullOrEmpty(detailsMsg))
                     err.ErrorDetails = new ErrorDetails(detailsMsg);
-
-                var invocationInfo = (psObj.Properties["InvocationInfo"]?.Value as InvocationInfo);
+                
                 
                 
                 return err;
@@ -99,7 +137,7 @@ public static class CliXml
         return null;
     }
 
-    public static ErrorRecord[]? DeserializeCliXmlError(StringBuilder sb)
+    public static List<ErrorRecord>? DeserializeCliXmlError(StringBuilder sb)
     {
         if (sb.Length == 0)
             return null;
@@ -125,16 +163,23 @@ public static class CliXml
 
             foreach (var o in objects)
             {
-                var err = ConvertToErrorRecord(o);
-                if (err is not null)
-                    errors.Add(err);
+                if (o is PSObject pso)
+                {
+                    if (pso.TypeNames.Contains("Deserialized.System.Management.Automation.ErrorRecord"))
+                    {
+                        var err = ErrorRecordReflectionHelper.FromPsObject(pso);
+                        if (err is not null)
+                            errors.Add(err);
+                    }
+
+                }
             }
-            
-            return errors.ToArray();
+
+            return errors;
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException("Error deserializing CLIXML", ex);
+            throw new InvalidOperationException($"Error deserializing CLIXML: {ex.Message}", ex);
         }
     }
     
