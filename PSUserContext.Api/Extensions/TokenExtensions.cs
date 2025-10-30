@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Interop;
 using static PSUserContext.Api.Interop.InteropTypes;
 
@@ -14,16 +15,16 @@ namespace PSUserContext.Api.Extensions
 	{
 		private static TokenElevationType GetTokenElevationType(SafeHandle hToken)
 		{
-			using var tokenInfo = GetTokenInformation(hToken, 18);
+			using var tokenInfo = GetTokenInformation(hToken, TOKEN_INFORMATION_CLASS.TokenElevationType);
 			return (TokenElevationType)Marshal.ReadInt32(tokenInfo.DangerousGetHandle());
 		}
-		private static SafeNativeHandle GetTokenLinkedToken(SafeHandle hToken)
+		private static SafeAccessTokenHandle GetTokenLinkedToken(SafeHandle hToken)
 		{
-			using var tokenInfo = GetTokenInformation(hToken, 19);
-			return new SafeNativeHandle(Marshal.ReadIntPtr(tokenInfo.DangerousGetHandle()));
+			using var tokenInfo = GetTokenInformation(hToken, TOKEN_INFORMATION_CLASS.TokenLinkedToken);
+			return new SafeAccessTokenHandle(Marshal.ReadIntPtr(tokenInfo.DangerousGetHandle()));
 		}
 
-		private static SafeHGlobalBuffer GetTokenInformation(SafeHandle hToken, uint infoClass)
+		private static SafeHGlobalBuffer GetTokenInformation(SafeHandle hToken, TOKEN_INFORMATION_CLASS infoClass)
 		{
 			if (hToken is null || hToken.IsInvalid)
 				throw new ArgumentException("Invalid token handle.", nameof(hToken));
@@ -49,29 +50,21 @@ namespace PSUserContext.Api.Extensions
 			if (requiredLength <= 0)
 				throw new InvalidOperationException($"GetTokenInformation({infoClass}) returned zero-length buffer requirement.");
 
-			// Allocate managed-safe memory for the result
+			// // Allocate managed-safe memory for the result
 			SafeHGlobalBuffer buffer = new SafeHGlobalBuffer(requiredLength);
 
-			try
-			{
-				// Second call — retrieve actual information
-				if (!Advapi32.GetTokenInformation(hToken, infoClass, buffer, requiredLength, out _))
-					throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), $"GetTokenInformation({infoClass}) failed.");
+			// Second call — retrieve actual information
+			if (!Advapi32.GetTokenInformation(hToken, infoClass, buffer, requiredLength, out _))
+				throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), $"GetTokenInformation({infoClass}) failed.");
 
-				return buffer; // ownership transferred to caller
-			}
-			catch
-			{
-				buffer.Dispose(); // prevent leaks if second call fails
-				throw;
-			}
+			return buffer; // ownership transferred to caller
 		}
 
-		private static SafeNativeHandle DuplicateTokenAsPrimary(SafeHandle hToken)
+		private static SafeAccessTokenHandle DuplicateTokenAsPrimary(SafeHandle hToken)
 		{
 			// todo: should I check token privileges here?
 			
-			if (!Advapi32.DuplicateTokenEx(hToken, 0, IntPtr.Zero, SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, InteropTypes.TOKEN_TYPE.TokenPrimary, out SafeNativeHandle pDupToken))
+			if (!Advapi32.DuplicateTokenEx(hToken, 0, IntPtr.Zero, SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, InteropTypes.TOKEN_TYPE.TokenPrimary, out var pDupToken))
 				throw new Interop.Win32Exception("Failed to duplicate impersonation token as primary");
 
 			return pDupToken;
@@ -85,7 +78,7 @@ namespace PSUserContext.Api.Extensions
 				throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), "Failed to get current process token");
 
 			using (hToken)
-			using (SafeHGlobalBuffer tokenInfo = GetTokenInformation(hToken, 3))
+			using (SafeHGlobalBuffer tokenInfo = GetTokenInformation(hToken, TOKEN_INFORMATION_CLASS.TokenPrivileges))
 			{
 				IntPtr basePtr = tokenInfo.DangerousGetHandle();
 
@@ -125,7 +118,7 @@ namespace PSUserContext.Api.Extensions
 			return attributes != PrivilegeAttributes.Disabled;
 		}
 
-		public static SafeNativeHandle GetSessionUserToken(string username, bool elevated = false)
+		public static SafeAccessTokenHandle GetSessionUserToken(string username, bool elevated = false)
 		{
 			var sessions = SessionExtensions.GetSessions();
 
@@ -143,13 +136,13 @@ namespace PSUserContext.Api.Extensions
 			return GetSessionUserToken(match.Id, elevated);
 		}
 
-		public static SafeNativeHandle GetSessionUserToken(uint sessionId, bool elevated = false)
+		public static SafeAccessTokenHandle GetSessionUserToken(uint sessionId, bool elevated = false)
 		{
 			if (sessionId == INVALID_SESSION_ID)
 				sessionId = SessionExtensions.GetActiveConsoleSessionId()
 					?? throw new InvalidOperationException("No active console session found. This typically occurs when no user is logged in.");
 
-			if (!Wtsapi32.WTSQueryUserToken(sessionId, out SafeNativeHandle hSessionUserToken))
+			if (!Wtsapi32.WTSQueryUserToken(sessionId, out var hSessionUserToken))
 			{
 				int error = Marshal.GetLastWin32Error();
 

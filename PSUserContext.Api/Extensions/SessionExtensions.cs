@@ -40,7 +40,7 @@ namespace PSUserContext.Api.Extensions
 		{
 			List<WtsSessionInfo> sessions = new List<WtsSessionInfo>();
 			
-			if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out SafeWtsMemoryHandle ppSessionInfo, out int count))
+			if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out var ppSessionInfo, out uint count))
 				throw new Win32Exception(Marshal.GetLastWin32Error(), "WTSEnumerateSessions failed.");
 
 			using (ppSessionInfo)

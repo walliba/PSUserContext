@@ -11,6 +11,7 @@ namespace PSUserContext.Api.Interop
 		private const string DllName = "kernel32.dll";
 		
 		[DllImport(DllName, SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool GetExitCodeProcess(IntPtr hProcess, out uint exitCode);
 		
 		[DllImport(DllName, SetLastError = true)]
@@ -52,7 +53,7 @@ namespace PSUserContext.Api.Interop
 			ref uint lpNumberOfBytesRead,
 			IntPtr lpOverlapped); // Usually IntPtr.Zero for synchronous I/O
 
-		[DllImport("kernel32.dll", SetLastError = true)]
+		[DllImport(DllName, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool PeekNamedPipe(
 			SafeHandle hNamedPipe,
@@ -62,13 +63,13 @@ namespace PSUserContext.Api.Interop
 			ref uint lpTotalBytesAvail,
 			ref uint lpBytesLeftThisMessage);
 
-		[DllImport("kernel32.dll", SetLastError = true)]
+		[DllImport(DllName, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool DuplicateHandle(
 			SafeHandle hSourceProcessHandle,
 			SafeHandle hSourceHandle,
 			SafeHandle hTargetProcessHandle, 
-			out SafeNativeHandle lpTargetHandle,
+			out SafeProcessHandle lpTargetHandle,
 			uint dwDesiredAccess, 
 			[MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, 
 			uint dwOptions);
