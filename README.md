@@ -1,7 +1,5 @@
 # PSUserContext
 
----
-
 **PSUserContext** is a compiled PowerShell module designed to execute commands within different user contexts.  
 A *user context* refers to a Windows terminal session — for example, the local console session or any active Remote Desktop (RDP) session.
 
@@ -9,8 +7,6 @@ This module provides fine-grained control over executing processes and scripts a
 
 
 ## Use Case
-
----
 
 ### 1. Refreshing Group Policy in a User Session
 System or RMM tasks often run under the **SYSTEM** account and can’t directly interact with the logged-on user’s environment.  
@@ -21,13 +17,9 @@ Get-UserContext -Console | Invoke-UserContext -ScriptBlock {gpupdate /target:use
 
 ## Planned Features
 
----
-
 - [ ] Deserialized output with interactable objects
 - [ ] Asynchronous batch execution across multiple sessions
 - [ ] Centralized and structured logging
-
----
 
 ## Credit
 
