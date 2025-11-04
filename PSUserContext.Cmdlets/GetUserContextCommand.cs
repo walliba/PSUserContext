@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq;
 using PSUserContext.Api.Models;
 using PSUserContext.Api.Extensions;
 using System.Management.Automation;
@@ -9,72 +10,107 @@ using PSUserContext.Api.Interop;
 
 namespace PSUserContext.Cmdlets
 {
-	[Cmdlet(VerbsCommon.Get,"UserContext", DefaultParameterSetName = "ById")]
-	[OutputType(typeof(WtsSessionInfo))]
-	[OutputType(typeof(ErrorRecord))]
+	[Cmdlet(VerbsCommon.Get,"UserContext")]
+	[OutputType(typeof(UserContextInfo))]
 	public sealed class GetUserContextCommand : PSCmdlet
 	{
-		private const string ById = "ById";
-		private const string ByUser = "ByUser";
-		
-		[Parameter(Position = 0, ParameterSetName = ById)]
-		[Alias("Id")]
-		public uint SessionId { get; set; } = InteropTypes.INVALID_SESSION_ID;
+		/// <summary>
+		/// Filters results by session ID.
+		/// </summary>
+		[Parameter(ValueFromPipelineByPropertyName = true)]
+		[ValidateRange(0, uint.MaxValue)]
+		[Alias("id")]
+		public uint? SessionId { get; set; } = null;
 
-		[Parameter(Position = 0, ParameterSetName = ByUser)]
-		[Alias("User")]
-		public string UserName { get; set; } = String.Empty;
+
+		/// <summary>
+		/// Filters results by the user's SamAccountName.
+		/// </summary>
+		/// <remarks>
+		/// Wildcards are supported. Matching is case-insensitive.
+		/// </remarks>
+		[Parameter(Position = 0, ValueFromPipelineByPropertyName = true)]
+		[Alias("name")]
+		public string? UserName { get; set; } = null;
+		
+		/// <summary>
+		/// Filters results by the user's domain name.
+		/// </summary>
+		/// <remarks>
+		/// Wildcards are supported. Matching is case-insensitive.
+		/// </remarks>
+		[Parameter(ValueFromPipelineByPropertyName = true)]
+		[Alias("domain")]
+		public string? DomainName { get; set; } = null;
+		
+		/// <summary>
+		/// When specified, returns only the active console session.
+		/// </summary>
+		[Parameter]
+		public SwitchParameter Console { get; set; }
+		
+		private IEnumerable<UserContextInfo>? _userContexts;
+		protected override void BeginProcessing()
+		{
+			// Only return sessions that we can obtain a session token from
+			_userContexts = SessionExtensions.GetSessions().Where(s => s.IsTokenEligible());
+			if (_userContexts is null)
+				ThrowTerminatingError(new ErrorRecord(
+					new ItemNotFoundException("No sessions were found."),
+					"SessionListNull",
+					ErrorCategory.ObjectNotFound,
+					null));
+		}
+		
 		protected override void ProcessRecord()
 		{
-			// If no session is supplied, list them
-			if (ParameterSetName == ById)
+			if (Console.IsPresent)
 			{
-				if (SessionId == InteropTypes.INVALID_SESSION_ID)
+				var session = SessionExtensions.GetActiveConsoleSession();
+
+				if (session is null)
 				{
-					var sessions = SessionExtensions.GetSessions();
-
-					foreach (var s in sessions)
-					{
-						// Skip listening sessions
-						if (s.State == WtsSessionState.Listen)
-							continue;
-
-						// Skip sessions with no user
-						if (string.IsNullOrEmpty(s.UserName) && string.IsNullOrEmpty(s.DomainName))
-							continue;
-
-						WriteObject(s);
-					}
-
-					return;
+					WriteError(new ErrorRecord(
+						new ItemNotFoundException($"No active console session found."),
+						"SessionNotFound",
+						ErrorCategory.ObjectNotFound,
+						null));
+				}
+				else
+				{
+					WriteObject(session);
 				}
 				
-				var found = SessionExtensions.GetSession(SessionId);
-				
-				if (found is not null)
-					WriteObject(found);
-				else
-					WriteError(new ErrorRecord(
-						new ItemNotFoundException($"No sessions found matching ID {SessionId}"),
-						"SessionNotFound",
-						ErrorCategory.ObjectNotFound,
-						SessionId));
+				return;
+			}
+			
+			IEnumerable<UserContextInfo> query = _userContexts!;
+			
+			if (MyInvocation.BoundParameters.ContainsKey(nameof(SessionId)))
+			{
+				query = query.Where(session => session.Id == SessionId);
 			}
 
-			if (ParameterSetName == ByUser)
+			if (MyInvocation.BoundParameters.ContainsKey(nameof(UserName)))
 			{
-				var found = SessionExtensions.GetSession(UserName);
-				
-				if (found is not null)
-					WriteObject(found);
-				else
-					WriteError(new ErrorRecord(
-						new ItemNotFoundException($"No sessions found for user '{UserName}'"),
-						"SessionNotFound",
-						ErrorCategory.ObjectNotFound,
-						UserName));
+				var pattern = WildcardPattern.Get(UserName, WildcardOptions.IgnoreCase);
+				query = query.Where(session => session.UserName is not null && pattern.IsMatch(session.UserName));
 			}
-				
+
+			if (MyInvocation.BoundParameters.ContainsKey(nameof(DomainName)))
+			{
+				var pattern = WildcardPattern.Get(DomainName, WildcardOptions.IgnoreCase);
+				query = query.Where(session => session.DomainName is not null && pattern.IsMatch(session.DomainName));
+			}
+			
+			if (!query.Any())
+				ThrowTerminatingError(new ErrorRecord(
+					new ItemNotFoundException("No eligible user sessions match the specified criteria."),
+					"SessionNotFound",
+					ErrorCategory.ObjectNotFound,
+					_userContexts));
+			else
+				WriteObject(query, true);
 		}
 	}
 }

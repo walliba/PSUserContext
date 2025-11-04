@@ -120,7 +120,7 @@ namespace PSUserContext.Api.Extensions
 
 		public static SafeAccessTokenHandle GetSessionUserToken(string username, bool elevated = false)
 		{
-			var sessions = SessionExtensions.GetSessions();
+			var sessions = SessionExtensions.GetSessions().ToList();
 
 			if (sessions.Count < 1)
 				throw new InvalidOperationException("No active sessions found.");

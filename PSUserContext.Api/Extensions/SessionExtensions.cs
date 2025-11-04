@@ -13,32 +13,54 @@ namespace PSUserContext.Api.Extensions
 {
 	public static class SessionExtensions
 	{
-		public static uint? GetActiveConsoleSessionId()
+		public static bool IsTokenEligible(this UserContextInfo ctx)
+		{
+			if (!Wtsapi32.WTSQueryUserToken(ctx.Id, out var hToken)) return false;
+			hToken.Dispose();
+			return true;
+		}
+		
+		private static bool IsNonInteractiveState(this WtsSessionState state) =>
+			state is WtsSessionState.Listen or WtsSessionState.Down or WtsSessionState.Init or WtsSessionState.Reset;
+		
+		internal static uint? GetActiveConsoleSessionId()
 		{
 			uint sessionId = Kernel32.WTSGetActiveConsoleSessionId();
 
 			if (sessionId == InteropTypes.INVALID_SESSION_ID)
 				return null;
-
+			
 			return sessionId;
 		}
+
+		public static UserContextInfo? GetActiveConsoleSession()
+		{
+			uint? sessionId = GetActiveConsoleSessionId();
+			
+			if (sessionId == null)
+				return null;
+			
+			return GetSession(sessionId.Value);
+		}
 		
-		public static WtsSessionInfo? GetSession(uint sessionId)
+		public static UserContextInfo? GetSession(uint sessionId)
 		{
 			var sessions = GetSessions();
+			
 			return sessions.FirstOrDefault(s => s.Id == sessionId);
 		}
-		public static WtsSessionInfo? GetSession(string userName, string? domainName = null)
+		public static UserContextInfo? GetSession(string userName, string? domainName = null)
 		{
 			var sessions = GetSessions();
+			
 			return sessions.FirstOrDefault(s =>
 				string.Equals(s.UserName, userName, StringComparison.OrdinalIgnoreCase) &&
 				(domainName is null || string.Equals(s.DomainName, domainName, StringComparison.OrdinalIgnoreCase)));
 		}
 
-		public static List<WtsSessionInfo> GetSessions()
+		public static IEnumerable<UserContextInfo> GetSessions()
 		{
-			List<WtsSessionInfo> sessions = new List<WtsSessionInfo>();
+			List<UserContextInfo> sessions = new List<UserContextInfo>();
 			
 			if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out var ppSessionInfo, out uint count))
 				throw new Win32Exception(Marshal.GetLastWin32Error(), "WTSEnumerateSessions failed.");
@@ -60,7 +82,7 @@ namespace PSUserContext.Api.Extensions
 						string? domainName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSDomainName);
 						string? sessionName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSWinStationName);
 
-						sessions.Add(new WtsSessionInfo()
+						sessions.Add(new UserContextInfo()
 						{
 							Id = sInfo.SessionId,
 							UserName = userName,
