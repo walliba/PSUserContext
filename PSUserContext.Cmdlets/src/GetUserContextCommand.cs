@@ -10,6 +10,12 @@ using PSUserContext.Api.Interop;
 
 namespace PSUserContext.Cmdlets
 {
+	/// <summary>
+	/// Get-UserContext allows you to query sessions on the local computer.
+	/// </summary>
+	/// <remarks>
+	/// This is similar to the native `quser` command.
+	/// </remarks>
 	[Cmdlet(VerbsCommon.Get,"UserContext")]
 	[OutputType(typeof(UserContextInfo))]
 	public sealed class GetUserContextCommand : PSCmdlet

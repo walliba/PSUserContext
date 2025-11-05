@@ -6,6 +6,9 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
+		<Authors>Bryce Wallis</Authors>
+		<PackageLicenseUrl>https://github.com/walliba/PSUserContext/blob/main/LICENSE.txt</PackageLicenseUrl>
+		<RepositoryUrl>https://github.com/walliba/PSUserContext</RepositoryUrl>
 	</PropertyGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">

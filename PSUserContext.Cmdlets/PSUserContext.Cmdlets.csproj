@@ -7,6 +7,26 @@
 		<LangVersion>latest</LangVersion>
 		<RootNamespace>PSUserContext.Cmdlets</RootNamespace>
 		<AssemblyName>PSUserContext.Cmdlets</AssemblyName>
+		<Authors>Bryce Wallis</Authors>
+		<PackageLicenseUrl>https://github.com/walliba/PSUserContext/blob/main/LICENSE.txt</PackageLicenseUrl>
+		<RepositoryUrl>https://github.com/walliba/PSUserContext</RepositoryUrl>
+		<NeutralLanguage>en-US</NeutralLanguage>
+	</PropertyGroup>
+
+    <!-- Used for manifest generation post-build-->
+    <Target Name="GenerateManifest" AfterTargets="Build">
+        <PropertyGroup>
+            <ModuleName>PSUserContext</ModuleName>
+            <ManifestTemplate>$(ProjectDir)module\$(ModuleName).psd1.template</ManifestTemplate>
+            <ManifestDirectory>$(OutDir)$(ModuleName)\</ManifestDirectory>
+            <ManifestOutput>$(ManifestDirectory)$(ModuleName).psd1</ManifestOutput>
+        </PropertyGroup>
+        <MakeDir Directories="$(OutDir)\PSUserContext" />
+        <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(ProjectDir)build\build.ps1&quot; -binDir $(ProjectDir)$(OutputPath) -Configuration $(Configuration)" />
+    </Target>
+    
+	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+	  <DocumentationFile>bin\Debug\PSUserContext.Cmdlets.xml</DocumentationFile>
 	</PropertyGroup>
 
 	<!-- Reference to your internal API project -->
@@ -39,6 +59,10 @@
 			<HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\WindowsPowerShell\3.0\System.Management.Automation.dll</HintPath>
 			<Private>true</Private>
 		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="docs\" />
 	</ItemGroup>
 
 </Project>

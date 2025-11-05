@@ -1,0 +1,14 @@
+@{
+    RootModule = 'PSUserContext.Cmdlets.dll'
+    ModuleVersion = '{{Version}}'
+    GUID = '{{Guid}}'
+    Author = '{{Authors}}'
+    Copyright = '© {{Year}} {{Authors}}'
+    Description = 'Provides cmdlets for managing and invoking user contexts'
+    PowerShellVersion = '5.1'
+    CompatiblePSEditions = @('Desktop')
+    FunctionsToExport = @()
+    CmdletsToExport = '*'
+    AliasesToExport = '*'
+    FileList = @('PSUserContext.Cmdlets.dll', 'PSUserContext.Api.dll')
+}
