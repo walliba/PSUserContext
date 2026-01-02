@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Management.Automation;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
 
@@ -14,6 +15,7 @@ namespace PSUserContext.Cmdlets;
 public sealed class InvokeUserContextCommand : PSCmdlet
 {
     private const string ById        = "ById";
+    private const string ByConsole   = "ByConsole";
     private const string CommandAct  = "+ScriptBlock";
     private const string FileAct     = "+File";
     private const string RedirectAct = "+Redirect";
@@ -21,15 +23,20 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     
     private const string ByIdCommand   = ById + CommandAct;
     private const string ByIdFile      = ById + FileAct;
+    
+    private const string ByConsoleCommand = ByConsole + CommandAct;
+    private const string ByConsoleFile = ByConsole + FileAct;
 
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, ParameterSetName = ByIdCommand)]
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, ParameterSetName = ByIdFile)]
     public uint SessionId { get; set; } = InteropTypes.INVALID_SESSION_ID;
     
     [Parameter(Mandatory = true, ParameterSetName = ByIdCommand)]
+    [Parameter(Mandatory = true, ParameterSetName = ByConsoleCommand)]
     public ScriptBlock? ScriptBlock { get; set; }
     
     [Parameter(Mandatory = true, ParameterSetName = ByIdFile)]
+    [Parameter(Mandatory = true, ParameterSetName = ByConsoleFile)]
     [Alias("File")]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
     public FileInfo FilePath { get; set; }
@@ -48,6 +55,13 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter]
     [Alias("Visible")] 
     public SwitchParameter ShowWindow { get; set; }
+    
+    /// <summary>
+    /// When specified, invokes the active console session.
+    /// </summary>
+    [Parameter(Mandatory = true, ParameterSetName = ByConsoleCommand)]
+    [Parameter(Mandatory = true, ParameterSetName = ByConsoleFile)]
+    public SwitchParameter Console { get; set; }
 
     private const string RequiredPrivilege = "SeDelegateSessionUserImpersonatePrivilege";
     private const string PowerShellPath    = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
@@ -99,7 +113,23 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             }
         }
 
-        var primaryToken = TokenExtensions.GetSessionUserToken(SessionId, false);
+        SafeAccessTokenHandle primaryToken;
+        
+        if (Console.IsPresent)
+        {
+            var consoleId = SessionExtensions.GetActiveConsoleSession();
+
+            if (consoleId is null)
+            {
+                throw new InvalidOperationException("No active console session found.");
+            }
+
+            primaryToken = TokenExtensions.GetSessionUserToken(consoleId, false);
+        }
+        else
+        {
+            primaryToken = TokenExtensions.GetSessionUserToken(SessionId, false);
+        }
 
         if (primaryToken == null || primaryToken.IsInvalid)
             throw new InvalidOperationException("Failed to get a valid session user token.");
