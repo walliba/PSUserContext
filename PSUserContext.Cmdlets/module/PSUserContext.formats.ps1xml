@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Configuration>
+    <ViewDefinitions>
+        <View>
+            <Name>PSUserContext.Api.Models.UserContextInfo</Name>
+            <ViewSelectedBy>
+                <TypeName>PSUserContext.Api.Models.UserContextInfo</TypeName>
+            </ViewSelectedBy>
+
+            <TableControl>
+                <TableHeaders>
+                    <TableColumnHeader><Label>DomainName</Label></TableColumnHeader>
+                    <TableColumnHeader><Label>UserName</Label></TableColumnHeader>
+                    <TableColumnHeader><Label>Id</Label></TableColumnHeader>
+                    <TableColumnHeader><Label>SessionName</Label></TableColumnHeader>
+                    <TableColumnHeader><Label>State</Label></TableColumnHeader>
+                </TableHeaders>
+
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <TableColumnItems>
+                            <TableColumnItem><PropertyName>DomainName</PropertyName></TableColumnItem>
+                            <TableColumnItem><PropertyName>UserName</PropertyName></TableColumnItem>
+                            <TableColumnItem><PropertyName>Id</PropertyName></TableColumnItem>
+                            <TableColumnItem><PropertyName>SessionName</PropertyName></TableColumnItem>
+                            <TableColumnItem><PropertyName>State</PropertyName></TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+    </ViewDefinitions>
+</Configuration>

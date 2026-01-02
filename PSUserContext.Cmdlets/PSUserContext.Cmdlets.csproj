@@ -11,6 +11,8 @@
 		<PackageLicenseUrl>https://github.com/walliba/PSUserContext/blob/main/LICENSE.txt</PackageLicenseUrl>
 		<RepositoryUrl>https://github.com/walliba/PSUserContext</RepositoryUrl>
 		<NeutralLanguage>en-US</NeutralLanguage>
+		<Title>PSUserContext</Title>
+		<Description>Proof-of-concept binary module for executing processes in alternate user contexts.</Description>
 	</PropertyGroup>
 
     <!-- Used for manifest generation post-build-->

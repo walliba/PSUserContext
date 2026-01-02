@@ -10,66 +10,7 @@ $bName = "PSUserContext.Cmdlets.dll"
 [string] $ManifestPath = [IO.Path]::Combine($ModulePath, "$ModuleName.psd1")
 $bModule = Import-Module $bPath -PassThru
 
-
-$ManifestTemplate = @"
-@{
-RootModule = '{{MODULE_ROOT}}'
-ModuleVersion = '1.0'
-CompatiblePSEditions = @('Desktop', 'Core')
-GUID = '3bb4a8f8-2973-45ed-8916-6fe74a804fca'
-Author = '{{AUTHOR}}'
-# CompanyName = 'Unknown'
-Copyright = 'Copyright (c) 2025 Bryce Wallis'
-Description = '{{DESCRIPTION}}'
-PowerShellVersion = '5.0'
-# Minimum version of Microsoft .NET Framework required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
-# DotNetFrameworkVersion = ''
-# Minimum version of the common language runtime (CLR) required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
-# CLRVersion = ''
-# Modules that must be imported into the global environment prior to importing this module
-# RequiredModules = @()
-# RequiredAssemblies = @()
-# ScriptsToProcess = @()
-# TypesToProcess = @()
-# FormatsToProcess = @()
-# NestedModules = @()
-# FunctionsToExport = '*'
-CmdletsToExport = @({{CMDLET_EXPORTS}})
-# VariablesToExport = '*'
-AliasesToExport = '*'
-# DscResourcesToExport = @()
-# ModuleList = @()
-# FileList = @()
-# Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
-PrivateData = @{
-
-    PSData = @{
-
-        # Tags applied to this module. These help with module discovery in online galleries.
-        # Tags = @()
-
-        # A URL to the license for this module.
-        # LicenseUri = ''
-
-        # A URL to the main website for this project.
-        # ProjectUri = ''
-
-        # A URL to an icon representing this module.
-        # IconUri = ''
-
-        # ReleaseNotes of this module
-        # ReleaseNotes = ''
-    }
-}
-
-# HelpInfo URI of this module
-# HelpInfoURI = ''
-
-# Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
-# DefaultCommandPrefix = ''
-}
-"@
-
+$ManifestTemplate = Get-Content -Path .\module\PSUserContext.psd1.template -Raw
 
 function Cleanup-Manifest
 {
@@ -91,10 +32,12 @@ function Cleanup-Manifest
     $builder.ToString()
 }
 
-$ManifestTemplate = $ManifestTemplate.Replace('{{DESCRIPTION}}', "This is my description")
+$ManifestTemplate = $ManifestTemplate.Replace('{{DESCRIPTION}}', "Proof-of-concept binary module for executing processes in alternate user contexts.")
 $ManifestTemplate = $ManifestTemplate.Replace('{{AUTHOR}}', "Bryce Wallis")
 $ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_ROOT}}', $bName)
 $ManifestTemplate = $ManifestTemplate.Replace('{{CMDLET_EXPORTS}}', ($bModule.ExportedCmdlets.Values.Name | % {"'$_'"}) -join ',')
+$ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_TYPES}}', "'PSUserContext.types.ps1xml'" -join ',')
+$ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_FORMATS}}', "'PSUserContext.formats.ps1xml'" -join ',')
 
 $ManifestTemplate = Cleanup-Manifest($ManifestTemplate)
 
@@ -102,6 +45,8 @@ $BinaryModules = @(
     $bName, "PSUserContext.Api.dll"
 ) | % {[IO.Path]::Combine($binDir, $_)}
 
+Copy-Item -Path .\module\PSUserContext.formats.ps1xml -Destination $ModulePath
+Copy-Item -Path .\module\PSUserContext.types.ps1xml -Destination $ModulePath
 Copy-Item $BinaryModules -Destination $ModulePath
 
 Write-Host "[Manifest] Copied module dlls to $ModulePath"

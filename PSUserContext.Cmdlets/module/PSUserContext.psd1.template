@@ -1,14 +1,53 @@
 @{
-    RootModule = 'PSUserContext.Cmdlets.dll'
-    ModuleVersion = '{{Version}}'
-    GUID = '{{Guid}}'
-    Author = '{{Authors}}'
-    Copyright = '© {{Year}} {{Authors}}'
-    Description = 'Provides cmdlets for managing and invoking user contexts'
+    RootModule = '{{MODULE_ROOT}}'
+    ModuleVersion = '1.0'
+    CompatiblePSEditions = @('Desktop', 'Core')
+    GUID = '3bb4a8f8-2973-45ed-8916-6fe74a804fca'
+    Author = '{{AUTHOR}}'
+    # CompanyName = 'Unknown'
+    Copyright = 'Copyright (c) 2025 Bryce Wallis'
+    Description = '{{DESCRIPTION}}'
     PowerShellVersion = '5.1'
-    CompatiblePSEditions = @('Desktop')
-    FunctionsToExport = @()
-    CmdletsToExport = '*'
+    # DotNetFrameworkVersion = 'net48'
+    CLRVersion = '4.0'
+    # RequiredModules = @()
+    # RequiredAssemblies = @()
+    # ScriptsToProcess = @()
+    TypesToProcess = @({{MODULE_TYPES}})
+    FormatsToProcess = @({{MODULE_FORMATS}})
+    # NestedModules = @()
+    # FunctionsToExport = '*'
+    CmdletsToExport = @({{CMDLET_EXPORTS}})
+    # VariablesToExport = '*'
     AliasesToExport = '*'
-    FileList = @('PSUserContext.Cmdlets.dll', 'PSUserContext.Api.dll')
+    # DscResourcesToExport = @()
+    # ModuleList = @()
+    # FileList = @()
+    # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
+    PrivateData = @{
+
+        PSData = @{
+
+        # Tags applied to this module. These help with module discovery in online galleries.
+            Tags = @('impersonation', 'session', 'context', 'automation', 'security', 'windows')
+
+            # A URL to the license for this module.
+            LicenseUri = 'https://github.com/walliba/PSUserContext/blob/main/LICENSE.txt'
+
+            # A URL to the main website for this project.
+            ProjectUri = 'https://github.com/walliba/PSUserContext'
+
+            # A URL to an icon representing this module.
+            # IconUri = ''
+
+            # ReleaseNotes of this module
+            # ReleaseNotes = ''
+        }
+    }
+
+    # HelpInfo URI of this module
+    # HelpInfoURI = ''
+
+    # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
+    # DefaultCommandPrefix = ''
 }
