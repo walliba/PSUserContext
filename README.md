@@ -1,5 +1,8 @@
 # PSUserContext
 
+> [!WARNING]
+> This project is under development and is not production-ready. APIs may change without notice.
+
 **PSUserContext** is a compiled PowerShell module designed to execute commands within different user contexts.  
 A *user context* refers to a Windows terminal session — for example, the local console session or any active Remote Desktop (RDP) session.
 
