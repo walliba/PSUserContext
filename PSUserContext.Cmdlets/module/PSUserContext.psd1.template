@@ -1,6 +1,6 @@
 @{
     RootModule = '{{MODULE_ROOT}}'
-    ModuleVersion = '1.0'
+    ModuleVersion = '1.1.0'
     CompatiblePSEditions = @('Desktop', 'Core')
     GUID = '3bb4a8f8-2973-45ed-8916-6fe74a804fca'
     Author = '{{AUTHOR}}'
