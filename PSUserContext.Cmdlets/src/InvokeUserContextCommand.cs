@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
+using PSUserContext.Cmdlets.Helpers;
 
 namespace PSUserContext.Cmdlets;
 
@@ -148,6 +149,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                     Redirect = redirectOptions,
                     WindowStyle = ShowWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
                 });
+
+            var stdOut = CliXml.DeserializeObject(result.StdOutput);
             
             if (RedirectOutput.IsPresent)
                 WriteObject(new UserProcessWithOutputResult
@@ -155,8 +158,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                     ProcessId = result.ProcessId,
                     SessionId = SessionId,
                     ExitCode = result.ExitCode,
-                    StandardOutput = result.StdOutput,
-                    StandardError = result.StdError
+                    StandardOutput = result.StdOutput?.ToString() ?? string.Empty,
+                    StandardError = result.StdError?.ToString() ?? string.Empty
                 });
             else
                 WriteObject(new UserProcessResult

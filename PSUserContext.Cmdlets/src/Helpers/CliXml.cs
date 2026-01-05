@@ -12,9 +12,9 @@ public static class CliXml
 {
     private const string LineStart = "#< CLIXML";
 
-    public static List<ErrorRecord>? DeserializeCliXmlError(StringBuilder sb)
+    public static List<ErrorRecord>? DeserializeError(StringBuilder? sb)
     {
-        if (sb.Length == 0)
+        if (sb is null || sb.Length == 0)
             return null;
 
         string xml = sb.ToString();
@@ -54,14 +54,13 @@ public static class CliXml
         }
         catch (Exception ex)
         {
-            // do nothing
-            // throw new InvalidOperationException($"Error deserializing CLIXML: {ex.Message}", ex);
+            throw new InvalidOperationException($"Error deserializing CLIXML: {ex.Message}", ex);
         }
     }
     
-    public static object[]? DeserializeCliXml(StringBuilder sb)
+    public static object[]? DeserializeObject(StringBuilder? sb)
     {
-        if (sb.Length == 0)
+        if (sb is null || sb.Length == 0)
             return null;
 
         string xml = sb.ToString();
