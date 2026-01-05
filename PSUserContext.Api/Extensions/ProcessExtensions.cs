@@ -98,15 +98,15 @@ public static class ProcessExtensions
         
         public uint ExitCode { get; init; }
         
-        public StringBuilder StdOutput { get; init; }
-        public StringBuilder StdError { get; init; }
+        public StringBuilder? StdOutput { get; init; }
+        public StringBuilder? StdError { get; init; }
 
         public UserProcessResult(uint processId, uint exitCode, StringBuilder? stdOut = null, StringBuilder? stdErr = null)
         {
             ProcessId = processId;
             ExitCode = exitCode;
-            StdOutput = stdOut ?? new StringBuilder();
-            StdError = stdErr ?? new StringBuilder();
+            StdOutput = stdOut;
+            StdError = stdErr;
         }
     }
 
@@ -121,7 +121,7 @@ public static class ProcessExtensions
             int bytesRead;
             while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
             {
-                sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+                sb.Append(Encoding.Default.GetString(buffer, 0, bytesRead));
             }
 
             return sb;

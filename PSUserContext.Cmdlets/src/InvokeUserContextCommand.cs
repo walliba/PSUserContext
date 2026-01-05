@@ -2,10 +2,12 @@
 using System;
 using System.IO;
 using System.Management.Automation;
+using System.Reflection;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
+using PSUserContext.Cmdlets.Helpers;
 
 namespace PSUserContext.Cmdlets;
 
@@ -53,7 +55,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     // todo: implement PassThru parameter
     
     [Parameter]
-    [Alias("Visible")] 
+    [Alias("Visible")]
     public SwitchParameter ShowWindow { get; set; }
     
     /// <summary>
@@ -66,6 +68,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     private const string RequiredPrivilege = "SeDelegateSessionUserImpersonatePrivilege";
     private const string PowerShellPath    = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
     
+    private PropertyInfo? _propertyInfo;
+    
     protected override void BeginProcessing()
     {   
         // temporary solution until I source generate parameter sets
@@ -76,7 +80,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         if (!TokenExtensions.HasTokenPrivilege(RequiredPrivilege))
             throw new InvalidOperationException(
                 "Missing required privilege. You must run this script as SYSTEM or have the SeDelegateSessionUserImpersonatePrivilege token.");
-
+        
+        _propertyInfo = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce", BindingFlags.NonPublic | BindingFlags.Instance);
     }
     protected override void ProcessRecord()
     {
@@ -84,7 +89,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         StringBuilder sbCommand =
             new StringBuilder(
-                $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle {(ShowWindow ? "Normal" : "Hidden")}");
+                $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -OutputFormat XML -WindowStyle {(ShowWindow ? "Normal" : "Hidden")}");
         
         if (ParameterSetName.Equals(ByIdFile))
         {
@@ -149,14 +154,29 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                     WindowStyle = ShowWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
                 });
             
+            var output = CliXml.Deserialize(result.StdOutput);
+            var err = CliXml.DeserializeError(result.StdError);
+            
+            if (output is not null)
+                foreach (var o in output)
+                    WriteObject(o);
+            
+            if (err is not null)
+                foreach (var o in err)
+                {
+                    _propertyInfo?.SetValue(o, true);
+                    WriteError(o);
+                }
+
+            return;
             if (RedirectOutput.IsPresent)
                 WriteObject(new UserProcessWithOutputResult
                 {
                     ProcessId = result.ProcessId,
                     SessionId = SessionId,
                     ExitCode = result.ExitCode,
-                    StandardOutput = result.StdOutput,
-                    StandardError = result.StdError
+                    StandardOutput = result.StdOutput?.ToString() ?? string.Empty,
+                    StandardError = result.StdError?.ToString() ?? string.Empty,
                 });
             else
                 WriteObject(new UserProcessResult
