@@ -8,7 +8,7 @@ using static PSUserContext.Api.Interop.Wtsapi32;
 
 namespace PSUserContext.Api.Models
 {
-	public class WtsSessionInfo
+	public class UserContextInfo
 	{
 		public string? DomainName { get; init; }
 		public string? UserName { get; init; }
@@ -16,7 +16,7 @@ namespace PSUserContext.Api.Models
 		public string? SessionName { get; init; }
 		public required WtsSessionState State { get; init; }
 		
-		public static implicit operator uint(WtsSessionInfo sessionInfo)
+		public static implicit operator uint(UserContextInfo sessionInfo)
 			=> sessionInfo.Id;
 		
 		public override string ToString()

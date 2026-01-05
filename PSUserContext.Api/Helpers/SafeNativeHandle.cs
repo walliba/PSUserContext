@@ -22,8 +22,7 @@ namespace PSUserContext.Api.Helpers
 
 			//Console.WriteLine("Releasing Native handle: {0}", handle.ToString("X"));
 
-			bool result = Kernel32.CloseHandle(handle);
-			return result;
+			return Kernel32.CloseHandle(handle);
 		}
 	}
 }

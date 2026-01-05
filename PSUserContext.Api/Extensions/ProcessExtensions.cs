@@ -128,7 +128,7 @@ public static class ProcessExtensions
         }, token);
     }
 
-    public static UserProcessResult CreateProcessAsUser(SafeNativeHandle userToken, ProcessOptions options)
+    public static UserProcessResult CreateProcessAsUser(SafeAccessTokenHandle userToken, ProcessOptions options)
     {
         var securityAttribute = new InteropTypes.SECURITY_ATTRIBUTES
         {
@@ -172,7 +172,7 @@ public static class ProcessExtensions
         {
             string? userProfilePath = environment.LatentGetVariable("USERPROFILE") ?? @"C:\Windows\System32";
             
-            if (!Advapi32.CreateProcessAsUserW(
+            if (!Advapi32.CreateProcessAsUser(
                     userToken,
                     options.ApplicationName,
                     options.CommandLine,

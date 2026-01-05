@@ -14,16 +14,18 @@ namespace PSUserContext.Api.Interop
 		private const string DllName = "advapi32.dll";
 
 		[DllImport(DllName, SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool DuplicateTokenEx(
-			SafeHandle ExistingTokenHandle,
+			SafeHandle hExistingTokenHandle,
 			uint dwDesiredAccess,
-			IntPtr lpThreadAttributes,
+			IntPtr lpTokenAttributes, // todo: make sure passing null/IntPtr.Zero is the best option
 			SECURITY_IMPERSONATION_LEVEL ImpersonationLevel,
 			TOKEN_TYPE TokenType,
-			out SafeNativeHandle DuplicateTokenHandle);
+			out SafeAccessTokenHandle phNewToken);
 
 		[DllImport(DllName, CharSet = CharSet.Unicode, SetLastError = true)]
-		internal static extern bool CreateProcessAsUserW(
+		[return: MarshalAs(UnmanagedType.Bool)]
+		internal static extern bool CreateProcessAsUser(
 			SafeHandle hToken,
 			string lpApplicationName,
 			StringBuilder lpCommandLine,
@@ -37,21 +39,24 @@ namespace PSUserContext.Api.Interop
 			out PROCESS_INFORMATION lpProcessInformation);
 
 		[DllImport(DllName, SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool GetTokenInformation(
 			SafeHandle TokenHandle,
-			uint TokenInformationClass,
+			TOKEN_INFORMATION_CLASS TokenInformationClass,
 			SafeHGlobalBuffer TokenInformation,
 			uint TokenInformationLength,
 			out uint ReturnLength);
 
 		[DllImport(DllName, CharSet = CharSet.Unicode, SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool LookupPrivilegeName(
 			string? lpSystemName,
-			ref LUID lpLuid,
-			StringBuilder? lpName,
+			in LUID lpLuid,
+			StringBuilder lpName,
 			ref uint cchName);
 
 		[DllImport(DllName, SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool OpenProcessToken(
 		   SafeHandle ProcessHandle,
 		   TokenAccessLevels DesiredAccess,

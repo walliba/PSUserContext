@@ -1,6 +1,7 @@
 ﻿using PSUserContext.Api.Helpers;
 using System;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace PSUserContext.Api.Interop
 {
@@ -57,10 +58,10 @@ namespace PSUserContext.Api.Interop
 		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool WTSEnumerateSessions(
 			IntPtr hServer,
-			int Reserved,
-			int Version,
+			uint Reserved, // Must be 0
+			uint Version, // Must be 1
 			out SafeWtsMemoryHandle ppSessionInfo,
-			out int pCount);
+			out uint pCount);
 
 		[DllImport(DllName, SetLastError = true)]
 		internal static extern void WTSFreeMemory(IntPtr pMemory);
@@ -69,7 +70,7 @@ namespace PSUserContext.Api.Interop
 		[return: MarshalAs(UnmanagedType.Bool)]
 		internal static extern bool WTSQueryUserToken(
 			uint SessionId,
-			out SafeNativeHandle phToken);
+			out SafeAccessTokenHandle phToken);
 
 		[DllImport(DllName, CharSet = CharSet.Unicode, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]

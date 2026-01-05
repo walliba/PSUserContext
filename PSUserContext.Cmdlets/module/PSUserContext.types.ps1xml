@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Types>
+    <Type>
+    <Name>PSUserContext.Api.Models.UserContextInfo</Name>
+    <Members>
+      <MemberSet>
+        <Name>PSStandardMembers</Name>
+        <Members>
+          <PropertySet>
+            <Name>DefaultDisplayPropertySet</Name>
+            <ReferencedProperties>
+              <Name>DomainName</Name>
+              <Name>UserName</Name>
+              <Name>Id</Name>
+              <Name>SessionName</Name>
+              <Name>State</Name>
+            </ReferencedProperties>
+          </PropertySet>
+        </Members>
+      </MemberSet>
+    </Members>
+  </Type>
+</Types>
