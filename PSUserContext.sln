@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSUserContext.Api", "PSUser
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSUserContext.Cmdlets", "PSUserContext.Cmdlets\PSUserContext.Cmdlets.csproj", "{EFC6F698-D191-E2AB-AB43-355E96AD4E32}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSUserContext.UserHost", "PSUserContext.UserHost\PSUserContext.UserHost.csproj", "{547CF4FB-4EB9-4703-B8BE-F6F418A73435}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{EFC6F698-D191-E2AB-AB43-355E96AD4E32}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EFC6F698-D191-E2AB-AB43-355E96AD4E32}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EFC6F698-D191-E2AB-AB43-355E96AD4E32}.Release|Any CPU.Build.0 = Release|Any CPU
+		{547CF4FB-4EB9-4703-B8BE-F6F418A73435}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{547CF4FB-4EB9-4703-B8BE-F6F418A73435}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{547CF4FB-4EB9-4703-B8BE-F6F418A73435}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{547CF4FB-4EB9-4703-B8BE-F6F418A73435}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -209,4 +209,137 @@ public static class ProcessExtensions
 
         return new UserProcessResult(processInfo.dwProcessId, exitCode, stdOutTask.GetAwaiter().GetResult(), stdErrTask.GetAwaiter().GetResult());
     }
+    
+    public static async Task<UserProcessResult> CreateProcessAsUserAsync(SafeAccessTokenHandle userToken, ProcessOptions options, CancellationToken cancellationToken = default)
+    {
+        var securityAttribute = new InteropTypes.SECURITY_ATTRIBUTES
+        {
+            nLength = (uint)Marshal.SizeOf<InteropTypes.SECURITY_ATTRIBUTES>(),
+            bInheritHandle = true,
+            lpSecurityDescriptor = IntPtr.Zero
+        };
+    
+        if (!Kernel32.CreatePipe(out var outRead, out var outWrite, ref securityAttribute, 4096)) // OS Default: 4 KB
+            throw new InvalidOperationException("failed to create output pipe");
+        if (!Kernel32.CreatePipe(out var errRead, out var errWrite, ref securityAttribute, 4096)) // OS Default: 4 KB
+            throw new InvalidOperationException("failed to create error pipe");
+        if (!Kernel32.SetHandleInformation(outRead, (uint)HandleFlags.Inherit, 0))
+            throw new InvalidOperationException("failed to set out read handle info");
+        if (!Kernel32.SetHandleInformation(errRead, (uint)HandleFlags.Inherit, 0))
+            throw new InvalidOperationException("failed to set err read handle info");
+        if (!Kernel32.SetHandleInformation(outWrite, (uint)HandleFlags.Inherit, (uint)HandleFlags.Inherit))
+            throw new InvalidOperationException("failed to set out write handle info");
+        if (!Kernel32.SetHandleInformation(errWrite, (uint)HandleFlags.Inherit, (uint)HandleFlags.Inherit))
+            throw new InvalidOperationException("failed to set err write handle info");
+
+        InteropTypes.PROCESS_INFORMATION processInfo;
+        var startupInfo = new InteropTypes.STARTUPINFO
+        {
+            cb = (uint)Marshal.SizeOf<InteropTypes.STARTUPINFO>(),
+            lpDesktop = @"winsta0\default",
+            wShowWindow = options.WindowStyle,
+            dwFlags = StartupInfoFlags.UseStdHandles | StartupInfoFlags.UseShowWindow,
+            hStdOutput = outWrite,
+            hStdError = errWrite
+        };
+
+        var dwCreationFlags = ProcessCreationFlags.CreateUnicodeEnvironment;
+
+        if (options.Redirect == RedirectFlags.None)
+            dwCreationFlags |= ProcessCreationFlags.CreateNewConsole;
+        
+        uint exitCode;
+        
+        using (var environment = EnvExtensions.CreateEnvironmentBlock(userToken))
+        {
+            string? userProfilePath = environment.LatentGetVariable("USERPROFILE") ?? @"C:\Windows\System32";
+            
+            if (!Advapi32.CreateProcessAsUser(
+                    userToken,
+                    options.ApplicationName,
+                    options.CommandLine,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    options.Redirect != 0,
+                    (uint)dwCreationFlags,
+                    environment,
+                    options.WorkingDirectory ?? userProfilePath,
+                    ref startupInfo,
+                    out processInfo))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessAsUser failed");
+        }
+        
+        var stdOutTask = ReadPipeTask(outRead);
+        var stdErrTask = ReadPipeTask(errRead);
+
+        outWrite?.Dispose();
+        errWrite?.Dispose();
+
+        try
+        {
+            await WaitForProcessExitAsync(processInfo.hProcess, cancellationToken).ConfigureAwait(false);
+            // Kernel32.WaitForSingleObject(processInfo.hProcess, INFINITE);
+            Kernel32.GetExitCodeProcess(processInfo.hProcess, out exitCode);
+        }
+        finally
+        {
+            Kernel32.CloseHandle(processInfo.hThread);
+            Kernel32.CloseHandle(processInfo.hProcess);
+        }
+        
+        if (options.Redirect == RedirectFlags.None)
+            return new UserProcessResult(processInfo.dwProcessId, exitCode);
+
+        return new UserProcessResult(processInfo.dwProcessId, exitCode, stdOutTask.GetAwaiter().GetResult(), stdErrTask.GetAwaiter().GetResult());
+    }
+    
+    private static Task WaitForProcessExitAsync(IntPtr hProcess, CancellationToken cancellationToken)
+    {
+        // If you have a SafeWaitHandle wrapper already, use it. We create one here.
+        // ownsHandle=false because you close hProcess yourself.
+        var safeWaitHandle = new SafeWaitHandle(hProcess, ownsHandle: false);
+        var waitHandle = new EventWaitHandle(false, EventResetMode.ManualReset);
+        waitHandle.SafeWaitHandle = safeWaitHandle;
+
+        var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        RegisteredWaitHandle? rwh = null;
+        rwh = ThreadPool.RegisterWaitForSingleObject(
+            waitHandle,
+            static (state, timedOut) =>
+            {
+                var (tcsInner, rwhInner, whInner) = ((TaskCompletionSource<object?>, RegisteredWaitHandle?, WaitHandle))state!;
+                try { rwhInner?.Unregister(null); } catch { /* ignore */ }
+                whInner.Dispose();
+                tcsInner.TrySetResult(null);
+            },
+            (tcs, rwh, waitHandle),
+            millisecondsTimeOutInterval: -1,
+            executeOnlyOnce: true);
+
+        // Fix closure state to include the registered handle
+        // (so callback can unregister and dispose)
+        // Re-register not needed; we just update state tuple via local capture.
+        // Easiest is to use a tiny helper:
+        var state = (tcs, rwh, (WaitHandle)waitHandle);
+
+        // Replace the state in callback by unregistering + re-registering would be overkill;
+        // so we use cancellation to clean up as well.
+        CancellationTokenRegistration ctr = default;
+        if (cancellationToken.CanBeCanceled)
+        {
+            ctr = cancellationToken.Register(() =>
+            {
+                try { rwh.Unregister(null); } catch { /* ignore */ }
+                waitHandle.Dispose();
+                tcs.TrySetCanceled(cancellationToken);
+            });
+        }
+
+        return tcs.Task.ContinueWith(t =>
+        {
+            ctr.Dispose();
+            return t;
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();
+    }
 }
