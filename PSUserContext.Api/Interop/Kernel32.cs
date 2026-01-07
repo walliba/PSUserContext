@@ -34,8 +34,19 @@ namespace PSUserContext.Api.Interop
 		internal static extern bool CreatePipe(
 			out SafeFileHandle hReadPipe,
 			out SafeFileHandle hWritePipe,
-			ref InteropTypes.SECURITY_ATTRIBUTES lpPipeAttributes,
+			ref InteropTypes.LPSECURITY_ATTRIBUTES lpPipeAttributes,
 			uint nSize);
+		
+		[DllImport(DllName, SetLastError = true, CharSet = CharSet.Unicode)]
+		static extern IntPtr CreateNamedPipe(
+			string lpName, 
+			uint dwOpenMode,
+			uint dwPipeMode,
+			uint nMaxInstances,
+			uint nOutBufferSize,
+			uint nInBufferSize,
+			uint nDefaultTimeOut,
+			ref InteropTypes.LPSECURITY_ATTRIBUTES lpPipeAttributes);
 
 		[DllImport(DllName, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
@@ -68,8 +79,8 @@ namespace PSUserContext.Api.Interop
 		internal static extern bool DuplicateHandle(
 			SafeHandle hSourceProcessHandle,
 			SafeHandle hSourceHandle,
-			SafeHandle hTargetProcessHandle, 
-			out SafeProcessHandle lpTargetHandle,
+			SafeHandle hTargetProcessHandle,
+			out IntPtr lpTargetHandle,
 			uint dwDesiredAccess, 
 			[MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, 
 			uint dwOptions);

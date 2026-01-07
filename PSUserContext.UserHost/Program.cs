@@ -1,6 +1,10 @@
 ﻿using System.Collections.ObjectModel;
 using System.IO.Pipes;
 using System.Management.Automation;
+using System.Runtime.InteropServices;
+using System.Text;
+using PSUserContext.Api.Extensions;
+using PSUserContext.Api.Interop;
 
 namespace PSUserContext.UserHost;
 
@@ -8,32 +12,46 @@ class Program
 {
     static void Main(string[] args)
     {
-        using (NamedPipeServerStream pipeServer =
-               new NamedPipeServerStream("testpipe", PipeDirection.Out))
+        bool showWindow = true;
+        const string PowerShellPath    = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
+        
+        var consoleId = SessionExtensions.GetActiveConsoleSession();
+        
+        if (consoleId is null)
         {
-            Console.WriteLine("NamedPipeServerStream object created.");
-
-            // Wait for a client to connect
-            Console.Write("Waiting for client connection...");
-            pipeServer.WaitForConnection();
-
-            Console.WriteLine("Client connected.");
-            try
-            {
-                // Read user input and send that to the client process.
-                using (StreamWriter sw = new StreamWriter(pipeServer))
-                {
-                    sw.AutoFlush = true;
-                    Console.Write("Enter text: ");
-                    sw.WriteLine(Console.ReadLine());
-                }
-            }
-            // Catch the IOException that is raised if the pipe is broken
-            // or disconnected.
-            catch (IOException e)
-            {
-                Console.WriteLine("ERROR: {0}", e.Message);
-            }
+            throw new InvalidOperationException("No active console session found.");
         }
+        
+        var primaryToken = TokenExtensions.GetSessionUserToken(consoleId, false);
+        
+        if (primaryToken == null || primaryToken.IsInvalid)
+            throw new InvalidOperationException("Failed to get a valid session user token.");
+        
+        StringBuilder sbCommand =
+            new StringBuilder(
+                $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -OutputFormat XML -WindowStyle {(showWindow ? "Normal" : "Hidden")}");
+        
+        using (primaryToken)
+        {
+            var redirectOptions = showWindow
+                ? ProcessExtensions.RedirectFlags.None
+                : ProcessExtensions.RedirectFlags.Output | ProcessExtensions.RedirectFlags.Error;
+
+            var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
+                new ProcessExtensions.ProcessOptions
+                {
+                    ApplicationName = PowerShellPath,
+                    CommandLine = sbCommand,
+                    Redirect = redirectOptions,
+                    WindowStyle = showWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
+                });
+
+            Console.WriteLine("ProcessId: {0}", result.ProcessId);
+            Console.WriteLine("SessionId: {0}", consoleId);
+            Console.WriteLine("ExitCode: {0}", result.ExitCode);
+        }
+
+        var readln = Console.ReadLine();
+        Console.WriteLine(readln);
     }
 }
