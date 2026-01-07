@@ -1,22 +1,33 @@
 ﻿using PSUserContext.Api.Helpers;
 using PSUserContext.Api.Models;
-using PSUserContext.Api.Interop;
+// using PSUserContext.Api.Interop;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using static PSUserContext.Api.Interop.Wtsapi32;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.System.RemoteDesktop;
+
+// using static PSUserContext.Api.Interop.Wtsapi32;
 
 namespace PSUserContext.Api.Extensions
 {
 	public static class SessionExtensions
 	{
-		public static bool IsTokenEligible(this UserContextInfo ctx)
+		private const uint INVALID_SESSION_ID = 0xFFFFFFFF;
+		
+		public static bool IsTokenValid(this UserContextInfo ctx)
 		{
-			if (!Wtsapi32.WTSQueryUserToken(ctx.Id, out var hToken)) return false;
-			hToken.Dispose();
+			if (!PInvoke.WTSQueryUserToken(ctx.Id, out var token))
+				return false;
+			
+			// Ensure handle is closed when exiting scope
+			using var _ = token;
+			
 			return true;
 		}
 		
@@ -25,9 +36,9 @@ namespace PSUserContext.Api.Extensions
 		
 		internal static uint? GetActiveConsoleSessionId()
 		{
-			uint sessionId = Kernel32.WTSGetActiveConsoleSessionId();
+			uint sessionId = PInvoke.WTSGetActiveConsoleSessionId();
 
-			if (sessionId == InteropTypes.INVALID_SESSION_ID)
+			if (sessionId == INVALID_SESSION_ID)
 				return null;
 			
 			return sessionId;
@@ -58,47 +69,37 @@ namespace PSUserContext.Api.Extensions
 				(domainName is null || string.Equals(s.DomainName, domainName, StringComparison.OrdinalIgnoreCase)));
 		}
 
-		public static IEnumerable<UserContextInfo> GetSessions()
+		public static unsafe IEnumerable<UserContextInfo> GetSessions()
 		{
 			List<UserContextInfo> sessions = new List<UserContextInfo>();
 			
-			if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out var ppSessionInfo, out uint count))
-				throw new Win32Exception(Marshal.GetLastWin32Error(), "WTSEnumerateSessions failed.");
+			if (!PInvoke.WTSEnumerateSessions(HANDLE.WTS_CURRENT_SERVER_HANDLE, 0, 1, out var ppSessionInfo, out uint count))
+				throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to enumerate WTS sessions.");
 
-			using (ppSessionInfo)
+			try
 			{
-				bool success = false;
-				try
+				for (int i = 0; i < count; i++)
 				{
-					ppSessionInfo.DangerousAddRef(ref success);
-					IntPtr basePtr = ppSessionInfo.DangerousGetHandle();
-					int dataSize = Marshal.SizeOf<WTS_SESSION_INFO>();
-
-					for (int i = 0; i < count; i++)
+					string? userName = PInvoke.WTSQuerySessionString(ppSessionInfo[i].SessionId, WTS_INFO_CLASS.WTSUserName);
+					string? domainName = PInvoke.WTSQuerySessionString(ppSessionInfo[i].SessionId, WTS_INFO_CLASS.WTSDomainName);
+					string? sessionName = PInvoke.WTSQuerySessionString(ppSessionInfo[i].SessionId, WTS_INFO_CLASS.WTSWinStationName);
+					
+					sessions.Add(new UserContextInfo()
 					{
-						IntPtr recordPtr = ppSessionInfo.DangerousGetHandle() + i * dataSize;
-						var sInfo = Marshal.PtrToStructure<WTS_SESSION_INFO>(recordPtr);
-						string? userName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSUserName);
-						string? domainName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSDomainName);
-						string? sessionName = Wtsapi32.GetSessionString(sInfo.SessionId, WTS_INFO_CLASS.WTSWinStationName);
+						Id = ppSessionInfo[i].SessionId,
+						UserName = userName,
+						DomainName = domainName,
+						SessionName = sessionName,
+						State = (int)ppSessionInfo[i].State
+					});
 
-						sessions.Add(new UserContextInfo()
-						{
-							Id = sInfo.SessionId,
-							UserName = userName,
-							DomainName = domainName,
-							SessionName = sessionName,
-							State =  sInfo.State,
-						});
-					}
-				}
-				finally
-				{
-					if (success)
-						ppSessionInfo?.DangerousRelease();
 				}
 			}
-
+			finally
+			{
+				PInvoke.WTSFreeMemory(ppSessionInfo);
+			}
+			
 			return sessions;
 		}
 	}

@@ -1,12 +1,9 @@
 ﻿using PSUserContext.Api.Interop;
 using System;
 using System.IO;
-using System.IO.Pipes;
 using System.Management.Automation;
 using System.Reflection;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
@@ -121,7 +118,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             }
         }
 
-        SafeAccessTokenHandle primaryToken;
+        SafeFileHandle primaryToken;
         
         if (Console.IsPresent)
         {
@@ -148,43 +145,38 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                 ? ProcessExtensions.RedirectFlags.None
                 : ProcessExtensions.RedirectFlags.Output | ProcessExtensions.RedirectFlags.Error;
 
-            var ipcPath =
-                "D:\\source\\UserContext\\PSUserContext.UserHost\\bin\\Release\\net472\\PSUserContext.UserHost.exe";
-
-            await ProcessExtensions.CreateProcessAsUserAsync(primaryToken,
+            var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
                 new ProcessExtensions.ProcessOptions
                 {
-                    // ApplicationName = PowerShellPath,
-                    // CommandLine = sbCommand,
-                    ApplicationName = ipcPath,
-                    CommandLine = null,
+                    ApplicationName = PowerShellPath,
+                    CommandLine = sbCommand,
                     Redirect = redirectOptions,
                     WindowStyle = ShowWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
                 });
             
-            // var output = CliXml.Deserialize(result.StdOutput);
-            // var err = CliXml.DeserializeError(result.StdError);
-            //
-            // if (output is not null)
-            //     foreach (var o in output)
-            //         WriteObject(o);
-            //
-            // if (err is not null)
-            //     foreach (var o in err)
-            //     {
-            //         _propertyInfo?.SetValue(o, true);
-            //         WriteError(o);
-            //     }
-            //
-            // if (RedirectOutput.IsPresent)
-            //     WriteObject(new UserProcessWithOutputResult
-            //     {
-            //         ProcessId = result.ProcessId,
-            //         SessionId = SessionId,
-            //         ExitCode = result.ExitCode,
-            //         StandardOutput = result.StdOutput?.ToString() ?? string.Empty,
-            //         StandardError = result.StdError?.ToString() ?? string.Empty,
-            //     });
+            var output = CliXml.Deserialize(result.StdOutput);
+            var err = CliXml.DeserializeError(result.StdError);
+            
+            if (output is not null)
+                foreach (var o in output)
+                    WriteObject(o);
+            
+            if (err is not null)
+                foreach (var o in err)
+                {
+                    _propertyInfo?.SetValue(o, true);
+                    WriteError(o);
+                }
+            
+            if (RedirectOutput.IsPresent)
+                WriteObject(new UserProcessWithOutputResult
+                {
+                    ProcessId = result.ProcessId,
+                    SessionId = SessionId,
+                    ExitCode = result.ExitCode,
+                    StandardOutput = result.StdOutput?.ToString() ?? string.Empty,
+                    StandardError = result.StdError?.ToString() ?? string.Empty,
+                });
             // else
             //     WriteObject(new UserProcessResult
             //     {
@@ -193,44 +185,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             //         ExitCode = result.ExitCode,
             //     });
             
-        }
-        
-        using (NamedPipeClientStream pipeClient =
-               new NamedPipeClientStream(".", "testpipe", PipeDirection.In))
-        {
-
-            // Connect to the pipe or wait until the pipe is available.
-            WriteWarning("Attempting to connect to pipe...");
-            pipeClient.Connect();
-
-            WriteWarning("Connected to pipe.");
-            WriteWarning($"There are currently {pipeClient.NumberOfServerInstances} pipe server instances open.");
-            using (StreamReader sr = new StreamReader(pipeClient))
-            {
-                // Display the read text to the console
-                string temp;
-                while ((temp = sr.ReadLine()) != null)
-                {
-                    WriteWarning($"Received from server: {temp}");
-                }
-            }
-        }
-    }
-
-    private async Task RunAsync(CancellationToken ct)
-    {
-        try
-        {
-            var result = await ProcessExtensions.CreateProcessAsUserAsync(primaryToken,
-                new ProcessExtensions.ProcessOptions
-                {
-                    // ApplicationName = PowerShellPath,
-                    // CommandLine = sbCommand,
-                    ApplicationName = ipcPath,
-                    CommandLine = null,
-                    Redirect = redirectOptions,
-                    WindowStyle = ShowWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
-                });
         }
     }
 }

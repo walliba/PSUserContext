@@ -59,7 +59,7 @@ namespace PSUserContext.Cmdlets
 		protected override void BeginProcessing()
 		{
 			// Only return sessions that we can obtain a session token from
-			_userContexts = SessionExtensions.GetSessions().Where(s => s.IsTokenEligible());
+			_userContexts = SessionExtensions.GetSessions().Where(s => s.IsTokenValid());
 			if (_userContexts is null)
 				ThrowTerminatingError(new ErrorRecord(
 					new ItemNotFoundException("No sessions were found."),

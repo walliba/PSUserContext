@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Win32.System.RemoteDesktop;
 using PSUserContext.Api.Extensions;
 using static PSUserContext.Api.Interop.Wtsapi32;
 
@@ -14,7 +15,7 @@ namespace PSUserContext.Api.Models
 		public string? UserName { get; init; }
 		public required uint Id { get; init; }
 		public string? SessionName { get; init; }
-		public required WtsSessionState State { get; init; }
+		public required int State { get; init; }
 		
 		public static implicit operator uint(UserContextInfo sessionInfo)
 			=> sessionInfo.Id;

@@ -128,11 +128,11 @@ public static class ProcessExtensions
         }, token);
     }
 
-    public static UserProcessResult CreateProcessAsUser(SafeAccessTokenHandle userToken, ProcessOptions options)
+    public static UserProcessResult CreateProcessAsUser(SafeFileHandle userToken, ProcessOptions options)
     {
-        var securityAttribute = new InteropTypes.SECURITY_ATTRIBUTES
+        var securityAttribute = new InteropTypes.LPSECURITY_ATTRIBUTES
         {
-            nLength = (uint)Marshal.SizeOf<InteropTypes.SECURITY_ATTRIBUTES>(),
+            nLength = (uint)Marshal.SizeOf<InteropTypes.LPSECURITY_ATTRIBUTES>(),
             bInheritHandle = true,
             lpSecurityDescriptor = IntPtr.Zero
         };
@@ -209,12 +209,13 @@ public static class ProcessExtensions
 
         return new UserProcessResult(processInfo.dwProcessId, exitCode, stdOutTask.GetAwaiter().GetResult(), stdErrTask.GetAwaiter().GetResult());
     }
-    
-    public static async Task<UserProcessResult> CreateProcessAsUserAsync(SafeAccessTokenHandle userToken, ProcessOptions options, CancellationToken cancellationToken = default)
+
+    public static async Task<UserProcessResult> CreateProcessAsUserAsync(SafeAccessTokenHandle userToken,
+        ProcessOptions options)
     {
-        var securityAttribute = new InteropTypes.SECURITY_ATTRIBUTES
+        var securityAttribute = new InteropTypes.LPSECURITY_ATTRIBUTES
         {
-            nLength = (uint)Marshal.SizeOf<InteropTypes.SECURITY_ATTRIBUTES>(),
+            nLength = (uint)Marshal.SizeOf<InteropTypes.LPSECURITY_ATTRIBUTES>(),
             bInheritHandle = true,
             lpSecurityDescriptor = IntPtr.Zero
         };
@@ -269,16 +270,15 @@ public static class ProcessExtensions
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessAsUser failed");
         }
         
-        var stdOutTask = ReadPipeTask(outRead);
-        var stdErrTask = ReadPipeTask(errRead);
+        var stdOutTask = await ReadPipeTask(outRead);
+        var stdErrTask = await ReadPipeTask(errRead);
 
         outWrite?.Dispose();
         errWrite?.Dispose();
 
         try
         {
-            await WaitForProcessExitAsync(processInfo.hProcess, cancellationToken).ConfigureAwait(false);
-            // Kernel32.WaitForSingleObject(processInfo.hProcess, INFINITE);
+            Kernel32.WaitForSingleObject(processInfo.hProcess, INFINITE);
             Kernel32.GetExitCodeProcess(processInfo.hProcess, out exitCode);
         }
         finally
@@ -290,56 +290,6 @@ public static class ProcessExtensions
         if (options.Redirect == RedirectFlags.None)
             return new UserProcessResult(processInfo.dwProcessId, exitCode);
 
-        return new UserProcessResult(processInfo.dwProcessId, exitCode, stdOutTask.GetAwaiter().GetResult(), stdErrTask.GetAwaiter().GetResult());
-    }
-    
-    private static Task WaitForProcessExitAsync(IntPtr hProcess, CancellationToken cancellationToken)
-    {
-        // If you have a SafeWaitHandle wrapper already, use it. We create one here.
-        // ownsHandle=false because you close hProcess yourself.
-        var safeWaitHandle = new SafeWaitHandle(hProcess, ownsHandle: false);
-        var waitHandle = new EventWaitHandle(false, EventResetMode.ManualReset);
-        waitHandle.SafeWaitHandle = safeWaitHandle;
-
-        var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        RegisteredWaitHandle? rwh = null;
-        rwh = ThreadPool.RegisterWaitForSingleObject(
-            waitHandle,
-            static (state, timedOut) =>
-            {
-                var (tcsInner, rwhInner, whInner) = ((TaskCompletionSource<object?>, RegisteredWaitHandle?, WaitHandle))state!;
-                try { rwhInner?.Unregister(null); } catch { /* ignore */ }
-                whInner.Dispose();
-                tcsInner.TrySetResult(null);
-            },
-            (tcs, rwh, waitHandle),
-            millisecondsTimeOutInterval: -1,
-            executeOnlyOnce: true);
-
-        // Fix closure state to include the registered handle
-        // (so callback can unregister and dispose)
-        // Re-register not needed; we just update state tuple via local capture.
-        // Easiest is to use a tiny helper:
-        var state = (tcs, rwh, (WaitHandle)waitHandle);
-
-        // Replace the state in callback by unregistering + re-registering would be overkill;
-        // so we use cancellation to clean up as well.
-        CancellationTokenRegistration ctr = default;
-        if (cancellationToken.CanBeCanceled)
-        {
-            ctr = cancellationToken.Register(() =>
-            {
-                try { rwh.Unregister(null); } catch { /* ignore */ }
-                waitHandle.Dispose();
-                tcs.TrySetCanceled(cancellationToken);
-            });
-        }
-
-        return tcs.Task.ContinueWith(t =>
-        {
-            ctr.Dispose();
-            return t;
-        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();
+        return new UserProcessResult(processInfo.dwProcessId, exitCode, stdOutTask, stdErrTask);
     }
 }
