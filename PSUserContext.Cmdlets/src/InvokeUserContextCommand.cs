@@ -27,20 +27,30 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     
     private const string ByConsoleCommand = ByConsole + CommandAct;
     private const string ByConsoleFile = ByConsole + FileAct;
-
-    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, ParameterSetName = ByIdCommand)]
-    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, ParameterSetName = ByIdFile)]
+    
+    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, ParameterSetName = ByIdCommand)]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, ParameterSetName = ByIdFile)]
     public uint SessionId { get; set; } = SessionExtensions.INVALID_SESSION_ID;
     
-    [Parameter(Mandatory = true, ParameterSetName = ByIdCommand)]
+    /// <summary>
+    /// When specified, invokes the active console session.
+    /// </summary>
+    /// <remark>
+    /// If no active console session is found, the Cmdlet throws an <see cref="InvalidOperationException">InvalidOperationException</see>
+    /// </remark>
     [Parameter(Mandatory = true, ParameterSetName = ByConsoleCommand)]
+    [Parameter(Mandatory = true, ParameterSetName = ByConsoleFile)]
+    public SwitchParameter Console { get; set; }
+    
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdCommand)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByConsoleCommand)]
     public ScriptBlock? ScriptBlock { get; set; }
     
     [Parameter(Mandatory = true, ParameterSetName = ByIdFile)]
     [Parameter(Mandatory = true, ParameterSetName = ByConsoleFile)]
     [Alias("File")]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
-    public FileInfo FilePath { get; set; }
+    public FileInfo? FilePath { get; set; }
     
     [Parameter(Position = 2)]
     [Alias("Args")]
@@ -56,13 +66,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter]
     [Alias("Visible")]
     public SwitchParameter ShowWindow { get; set; }
-    
-    /// <summary>
-    /// When specified, invokes the active console session.
-    /// </summary>
-    [Parameter(Mandatory = true, ParameterSetName = ByConsoleCommand)]
-    [Parameter(Mandatory = true, ParameterSetName = ByConsoleFile)]
-    public SwitchParameter Console { get; set; }
 
     private const string RequiredPrivilege = "SeDelegateSessionUserImpersonatePrivilege";
     private const string PowerShellPath    = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
