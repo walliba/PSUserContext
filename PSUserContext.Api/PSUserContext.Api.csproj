@@ -1,9 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net48;netstandard2.0</TargetFrameworks>
-
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<TargetFrameworks>net472;netstandard2.0</TargetFrameworks>
+		<IsPackable>false</IsPackable>
 		<Nullable>enable</Nullable>
 		<LangVersion>12</LangVersion>
 		<Authors>Bryce Wallis</Authors>
@@ -13,22 +12,18 @@
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
 		<PackageReference Include="System.Security.Principal.Windows" Version="5.0.0" />
-		<PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.264">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+	<ItemGroup Condition="'$(TargetFramework)' == 'net472'">
 		<!-- No need to reference System.Security.Principal.Windows explicitly -->
+	</ItemGroup>
+	
+	<ItemGroup>
 		<PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.264">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <PackageReference Include="System.Memory" Version="4.6.3" />
-	  <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
+		<PackageReference Include="System.Memory" Version="4.6.3" />
+		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
 	</ItemGroup>
 </Project>
