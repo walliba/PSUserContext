@@ -4,7 +4,6 @@ using System.Management.Automation;
 using System.Runtime.InteropServices;
 using System.Text;
 using PSUserContext.Api.Extensions;
-using PSUserContext.Api.Interop;
 
 namespace PSUserContext.UserHost;
 
@@ -43,7 +42,7 @@ class Program
                     ApplicationName = PowerShellPath,
                     CommandLine = sbCommand,
                     Redirect = redirectOptions,
-                    WindowStyle = showWindow ? InteropTypes.SW.SHOW : InteropTypes.SW.HIDE
+                    WindowStyle = (ushort)(showWindow ? 5 : 0)
                 });
 
             Console.WriteLine("ProcessId: {0}", result.ProcessId);
@@ -51,7 +50,6 @@ class Program
             Console.WriteLine("ExitCode: {0}", result.ExitCode);
         }
 
-        var readln = Console.ReadLine();
-        Console.WriteLine(readln);
+        Console.ReadLine();
     }
 }

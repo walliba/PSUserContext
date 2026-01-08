@@ -7,9 +7,17 @@ TOKEN_ELEVATION_TYPE
 TOKEN_LINKED_TOKEN
 TOKEN_PRIVILEGES
 GetCurrentProcess
+GetExitCodeProcess
+CreatePipe
+CreateNamedPipe
+SetHandleInformation
 WTSQueryUserToken
 WTSGetActiveConsoleSessionId
 WTSEnumerateSessions
 WTSFreeMemory
 WTSQuerySessionInformation
 WTS_CURRENT_SERVER_HANDLE
+ShowWindow
+CreateEnvironmentBlock
+DestroyEnvironmentBlock
+WaitForSingleObject

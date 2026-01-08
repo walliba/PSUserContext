@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Windows.Win32.System.RemoteDesktop;
+﻿using System.Collections.Generic;
 using PSUserContext.Api.Extensions;
-using static PSUserContext.Api.Interop.Wtsapi32;
 
 namespace PSUserContext.Api.Models
 {

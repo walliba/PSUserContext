@@ -1,10 +1,8 @@
 ﻿// ReSharper disable CheckNamespace
-
 using System;
 using System.Runtime.InteropServices;
 using Windows.Win32.Foundation;
 using Microsoft.Win32.SafeHandles;
-using PSUserContext.Api.Interop;
 using Win32Exception = System.ComponentModel.Win32Exception;
 using winmdroot = global::Windows.Win32;
 
@@ -28,6 +26,29 @@ internal sealed class SafeWtsMemoryHandle : SafeHandleZeroOrMinusOneIsInvalid
 
         PInvoke.WTSFreeMemory(handle.ToPointer());
         return true;
+    }
+}
+
+/// <summary>
+/// Represents a handle to an environment block created by CreateEnvironmentBlock.
+/// Automatically frees the block using DestroyEnvironmentBlock when disposed.
+/// </summary>
+public sealed class SafeEnvironmentBlockHandle : SafeHandleZeroOrMinusOneIsInvalid
+{
+    public SafeEnvironmentBlockHandle() : base(true) { }
+
+    public SafeEnvironmentBlockHandle(IntPtr handle, bool ownsHandle = true) : base(ownsHandle)
+    {
+        SetHandle(handle);
+    }
+
+    protected override unsafe bool ReleaseHandle()
+    {
+        if (IsInvalid)
+            return true;
+        
+        // Always call DestroyEnvironmentBlock to release memory.
+        return PInvoke.DestroyEnvironmentBlock(handle.ToPointer());
     }
 }
 
@@ -56,6 +77,14 @@ internal static partial class PInvoke
         return __result;
     }
 
+    internal static unsafe winmdroot.Foundation.BOOL CreateSafeEnvironmentBlock(
+        out SafeEnvironmentBlockHandle hEnvironment, [Optional] SafeHandle hToken, winmdroot.Foundation.BOOL bInherit)
+    {
+        winmdroot.Foundation.BOOL __result = PInvoke.CreateEnvironmentBlock(out var lpEnvironment, hToken, bInherit);
+        hEnvironment = new SafeEnvironmentBlockHandle((IntPtr)lpEnvironment, ownsHandle: true);
+        return __result;
+    }
+
     internal static string? WTSQuerySessionString(uint sessionId,
         winmdroot.System.RemoteDesktop.WTS_INFO_CLASS WTSInfoClass)
     {
@@ -64,5 +93,16 @@ internal static partial class PInvoke
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Error while querying WTS session string");
 
         return ppBuffer.ToString();
+    }
+    
+    internal static unsafe winmdroot.Foundation.BOOL GetExitCodeProcess(winmdroot.Foundation.HANDLE hProcess, out uint lpExitCode)
+    {
+        fixed (uint* lpExitCodeLocal = &lpExitCode)
+        {
+            winmdroot.Foundation.HANDLE hProcessLocal = HANDLE.Null;
+                
+            winmdroot.Foundation.BOOL __result = PInvoke.GetExitCodeProcess(hProcessLocal, lpExitCodeLocal);
+            return __result;
+        }
     }
 }

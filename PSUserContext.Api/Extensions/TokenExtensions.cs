@@ -12,8 +12,6 @@ namespace PSUserContext.Api.Extensions
 {
 	public static class TokenExtensions
 	{
-		private const uint INVALID_SESSION_ID = 0xFFFFFFFF;
-
 		private static T GetTokenInfoStruct<T>(SafeHandle token, TOKEN_INFORMATION_CLASS tokenInformationClass)
 			where T : unmanaged
 		{
@@ -51,7 +49,7 @@ namespace PSUserContext.Api.Extensions
 			{
 				int error = Marshal.GetLastWin32Error();
 				if (error != ERROR_INSUFFICIENT_BUFFER && error != ERROR_BAD_LENGTH)
-					throw new Interop.Win32Exception(error, $"GetTokenInformation({infoClass}) failed to query buffer size.");
+					throw new System.ComponentModel.Win32Exception(error, $"GetTokenInformation({infoClass}) failed to query buffer size.");
 			}
 			
 			if (needLength == 0)
@@ -61,7 +59,7 @@ namespace PSUserContext.Api.Extensions
 			Span<byte> buffer = new Span<byte>(new byte[needLength]);
 			
 			if (!PInvoke.GetTokenInformation(hToken, infoClass, buffer, out _))
-				throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), $"GetTokenInformation({infoClass}) failed.");
+				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), $"GetTokenInformation({infoClass}) failed.");
 			
 			return buffer;
 		}
@@ -71,12 +69,12 @@ namespace PSUserContext.Api.Extensions
 			// todo: should I check token privileges here?
 			
 			if (!Windows.Win32.PInvoke.DuplicateTokenEx(hToken, 0, null, Windows.Win32.Security.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Windows.Win32.Security.TOKEN_TYPE.TokenPrimary, out var pDupToken))
-				throw new Interop.Win32Exception("Failed to duplicate impersonation token as primary");
+				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Failed to duplicate impersonation token as primary");
 
 			return pDupToken;
 		}
 
-		private static Dictionary<String, TOKEN_PRIVILEGES_ATTRIBUTES> GetTokenPrivileges()
+		private static unsafe Dictionary<String, TOKEN_PRIVILEGES_ATTRIBUTES> GetTokenPrivileges()
 		{
 			Dictionary<string, TOKEN_PRIVILEGES_ATTRIBUTES> privileges = new Dictionary<string, TOKEN_PRIVILEGES_ATTRIBUTES>();
 			
@@ -89,9 +87,10 @@ namespace PSUserContext.Api.Extensions
 			using (hProcessToken)
 			{
 				var tokenPrivileges = GetTokenPrivileges(hProcessToken);
-
+				
 				for (int i = 0; i < tokenPrivileges.PrivilegeCount; i++)
 				{
+					// todo: read unmanaged array, as this is currently broken
 					var info = tokenPrivileges.Privileges[i];
 					
 					uint needed = 0;
@@ -100,8 +99,9 @@ namespace PSUserContext.Api.Extensions
 					Span<char> buffer = new char[needed];
 					uint size = (uint)buffer.Length;
 					PInvoke.LookupPrivilegeName(null, info.Luid, buffer, ref size);
-					
-					privileges[buffer.ToString()] = info.Attributes;
+					var name = new string(buffer.ToArray());
+					Console.WriteLine($"Privilege '{name}': {(uint)info.Attributes}");
+					privileges[name] = info.Attributes;
 				}
 			}
 
@@ -111,11 +111,14 @@ namespace PSUserContext.Api.Extensions
 		public static bool HasTokenPrivilege(string privilege)
 		{
 			var privileges = GetTokenPrivileges();
-			
-			if (!privileges.TryGetValue(privilege, out var attributes))
-				return false;
 
-			return attributes != 0;
+			if (!privileges.TryGetValue(privilege, out var attributes))
+			{
+				Console.WriteLine("No token privileges found.");
+				return false;
+			}
+
+			return attributes == TOKEN_PRIVILEGES_ATTRIBUTES.SE_PRIVILEGE_ENABLED;
 		}
 
 		public static SafeFileHandle GetSessionUserToken(string username, bool elevated = false)
@@ -138,7 +141,7 @@ namespace PSUserContext.Api.Extensions
 
 		public static unsafe SafeFileHandle GetSessionUserToken(uint sessionId, bool elevated = false)
 		{
-			if (sessionId == INVALID_SESSION_ID)
+			if (sessionId == SessionExtensions.INVALID_SESSION_ID)
 				sessionId = SessionExtensions.GetActiveConsoleSessionId()
 					?? throw new InvalidOperationException("No active console session found. This typically occurs when no user is logged in.");
 			
@@ -150,7 +153,7 @@ namespace PSUserContext.Api.Extensions
 				if (error is 2 or 87 or 7022)
 						throw new InvalidOperationException($"The session ID {sessionId} does not exist");
 				
-				throw new Interop.Win32Exception(Marshal.GetLastWin32Error(), $"Failed to query user token for session {sessionId}");
+				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), $"Failed to query user token for session {sessionId}");
 			}
 			
 			// todo: investigate if this using causes issues with the returned handle / make DuplicateTokenAsPrimary handle disposal

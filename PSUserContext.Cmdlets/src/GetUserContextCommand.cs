@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Diagnostics;
+﻿using System.Collections.Generic;
 using System.Linq;
 using PSUserContext.Api.Models;
 using PSUserContext.Api.Extensions;
 using System.Management.Automation;
-using PSUserContext.Api.Interop;
 
 namespace PSUserContext.Cmdlets
 {

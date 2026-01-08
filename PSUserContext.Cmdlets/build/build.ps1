@@ -42,7 +42,7 @@ $ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_FORMATS}}', "'PSUserCont
 $ManifestTemplate = Cleanup-Manifest($ManifestTemplate)
 
 $BinaryModules = @(
-    $bName, "PSUserContext.Api.dll"
+    $bName, "PSUserContext.Api.dll", "System.Memory.dll", "System.Runtime.CompilerServices.Unsafe.dll", "System.Numerics.Vectors.dll"
 ) | % {[IO.Path]::Combine($binDir, $_)}
 
 Copy-Item -Path .\module\PSUserContext.formats.ps1xml -Destination $ModulePath

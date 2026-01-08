@@ -1,13 +1,9 @@
-﻿using PSUserContext.Api.Helpers;
-using PSUserContext.Api.Models;
-// using PSUserContext.Api.Interop;
+﻿using PSUserContext.Api.Models;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.System.RemoteDesktop;
@@ -18,7 +14,7 @@ namespace PSUserContext.Api.Extensions
 {
 	public static class SessionExtensions
 	{
-		private const uint INVALID_SESSION_ID = 0xFFFFFFFF;
+		public const uint INVALID_SESSION_ID = 0xFFFFFFFF;
 		
 		public static bool IsTokenValid(this UserContextInfo ctx)
 		{
