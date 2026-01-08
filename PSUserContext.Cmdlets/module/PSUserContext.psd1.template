@@ -11,7 +11,7 @@
     # DotNetFrameworkVersion = 'net48'
     CLRVersion = '4.0'
     # RequiredModules = @()
-    # RequiredAssemblies = @()
+    RequiredAssemblies = @({{MODULE_ASSEMBLIES}})
     # ScriptsToProcess = @()
     TypesToProcess = @({{MODULE_TYPES}})
     FormatsToProcess = @({{MODULE_FORMATS}})

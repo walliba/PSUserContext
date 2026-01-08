@@ -5,12 +5,23 @@ param(
 
 $ModuleName = "PSUserContext"
 $bName = "PSUserContext.Cmdlets.dll"
+
 [string] $bPath = [IO.Path]::Combine($binDir, $bName)
 [string] $ModulePath = [IO.Path]::Combine($binDir, $ModuleName)
+[string] $ModuleBin = [IO.Path]::Combine($ModulePath, 'bin')
 [string] $ManifestPath = [IO.Path]::Combine($ModulePath, "$ModuleName.psd1")
 $bModule = Import-Module $bPath -PassThru
 
-$ManifestTemplate = Get-Content -Path .\module\PSUserContext.psd1.template -Raw
+$BinaryModules = @(
+    $bName, "PSUserContext.Api.dll"
+) | % {[IO.Path]::Combine($binDir, $_)}
+
+if ((Split-Path ($binDir.TrimEnd('\')) -Leaf) -like "net4*")
+{
+    $BinaryModules = @(
+        $bName, "PSUserContext.Api.dll", "System.Memory.dll", "System.Runtime.CompilerServices.Unsafe.dll", "System.Numerics.Vectors.dll"
+    ) | % {[IO.Path]::Combine($binDir, $_)}
+}
 
 function Cleanup-Manifest
 {
@@ -32,31 +43,43 @@ function Cleanup-Manifest
     $builder.ToString()
 }
 
+function Get-RelativeBin
+{
+    param(
+        [string]$file
+    )
+    
+    return ".\bin\{0}" -f $file
+}
+
+function Copy-Binaries 
+{
+    if (-not (Test-Path -Path $ModuleBin))
+    {
+        $null = New-Item -ItemType Directory -Path $ModuleBin -Force
+    }
+    
+    Copy-Item -Path $BinaryModules -Destination $ModuleBin
+
+    Write-Host "[Manifest] Copied module dlls to $ModulePath"
+}
+
+$ManifestTemplate = Get-Content -Path .\module\PSUserContext.psd1.template -Raw
+
 $ManifestTemplate = $ManifestTemplate.Replace('{{DESCRIPTION}}', "Proof-of-concept binary module for executing processes in alternate user contexts.")
 $ManifestTemplate = $ManifestTemplate.Replace('{{AUTHOR}}', "Bryce Wallis")
-$ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_ROOT}}', $bName)
+$ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_ROOT}}', ".\bin\{0}" -f $bName)
+$ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_ASSEMBLIES}}', ($BinaryModules | Where-Object {$_ -ne $bName} | % {"'$_'"}) -join ',')
 $ManifestTemplate = $ManifestTemplate.Replace('{{CMDLET_EXPORTS}}', ($bModule.ExportedCmdlets.Values.Name | % {"'$_'"}) -join ',')
 $ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_TYPES}}', "'PSUserContext.types.ps1xml'" -join ',')
 $ManifestTemplate = $ManifestTemplate.Replace('{{MODULE_FORMATS}}', "'PSUserContext.formats.ps1xml'" -join ',')
 
 $ManifestTemplate = Cleanup-Manifest($ManifestTemplate)
 
-$BinaryModules = @(
-    $bName, "PSUserContext.Api.dll"
-) | % {[IO.Path]::Combine($binDir, $_)}
-
-if ((Split-Path ($binDir.TrimEnd('\')) -Leaf) -like "net4*")
-{
-    $BinaryModules = @(
-        $bName, "PSUserContext.Api.dll", "System.Memory.dll", "System.Runtime.CompilerServices.Unsafe.dll", "System.Numerics.Vectors.dll"
-    ) | % {[IO.Path]::Combine($binDir, $_)}
-}
+Copy-Binaries
 
 Copy-Item -Path .\module\PSUserContext.formats.ps1xml -Destination $ModulePath
 Copy-Item -Path .\module\PSUserContext.types.ps1xml -Destination $ModulePath
-Copy-Item $BinaryModules -Destination $ModulePath
-
-Write-Host "[Manifest] Copied module dlls to $ModulePath"
 
 $ManifestTemplate | Out-File -FilePath $ManifestPath -Encoding utf8
 
