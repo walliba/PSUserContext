@@ -24,7 +24,13 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     private const string ByIdFile         = ById + FileAct;
     private const string ByConsoleCommand = ByConsole + CommandAct;
     private const string ByConsoleFile    = ByConsole + FileAct;
-
+    
+    /// <summary>
+    /// The session ID of the user context to invoke.
+    /// </summary>
+    /// <remarks>
+    /// Session ID can be located with the native <c>quser</c> command and the <c>Get-UserContext</c> cmdlet.
+    /// </remarks>
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
         ParameterSetName = ByIdCommand)]
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
