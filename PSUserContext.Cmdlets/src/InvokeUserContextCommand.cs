@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Management.Automation;
 using System.Reflection;
 using System.Text;
+using Microsoft.PowerShell.Commands;
 using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
@@ -16,15 +19,28 @@ namespace PSUserContext.Cmdlets;
 [OutputType(typeof(UserProcessWithOutputResult))]
 public sealed class InvokeUserContextCommand : PSCmdlet
 {
-    private const string ById             = "ById";
-    private const string ByConsole        = "ByConsole";
-    private const string CommandAct       = "+ScriptBlock";
-    private const string FileAct          = "+File";
-    private const string ByIdCommand      = ById + CommandAct;
-    private const string ByIdFile         = ById + FileAct;
-    private const string ByConsoleCommand = ByConsole + CommandAct;
-    private const string ByConsoleFile    = ByConsole + FileAct;
-    
+    // todo: fix poor ParameterSet strategy
+    private const string ById                 = "ById";
+    private const string ByConsole            = "ByConsole";
+    private const string CommandAct           = "+ScriptBlock";
+    private const string PathAct              = "+Path";
+    private const string LiteralPathAct       = "+LiteralPath";
+    private const string ByIdCommand          = ById + CommandAct;
+    private const string ByIdPath             = ById + PathAct;
+    private const string ByIdPathLiteral      = ByIdPath + LiteralPathAct;
+    private const string ByConsoleCommand     = ByConsole + CommandAct;
+    private const string ByConsolePath        = ByConsole + PathAct;
+    private const string ByConsolePathLiteral = ByConsole + LiteralPathAct;
+
+    private const string RequiredPrivilege     = "SeDelegateSessionUserImpersonatePrivilege";
+    private const string WindowsPowershellPath = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
+
+    private PropertyInfo? _preserveInvocationInfoOnce;
+    private bool          _shouldExpandPath;
+    private string        _path = string.Empty;
+
+    private StringBuilder _sbCommand = new ($"\"{WindowsPowershellPath}\" -ExecutionPolicy Bypass -NoLogo -OutputFormat XML");
+
     /// <summary>
     /// The session ID of the user context to invoke.
     /// </summary>
@@ -34,7 +50,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
         ParameterSetName = ByIdCommand)]
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
-        ParameterSetName = ByIdFile)]
+        ParameterSetName = ByIdPath)]
     public uint SessionId { get; set; }
 
     /// <summary>
@@ -44,20 +60,37 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     /// If no active console session is found, the Cmdlet throws an <see cref="InvalidOperationException">InvalidOperationException</see>
     /// </remark>
     [Parameter(Mandatory = true, ParameterSetName = ByConsoleCommand)]
-    [Parameter(Mandatory = true, ParameterSetName = ByConsoleFile)]
+    [Parameter(Mandatory = true, ParameterSetName = ByConsolePath)]
     public SwitchParameter Console { get; set; }
 
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdCommand)]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByConsoleCommand)]
     public ScriptBlock ScriptBlock { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = ByIdFile)]
-    [Parameter(Mandatory = true, ParameterSetName = ByConsoleFile)]
-    [Alias("File")]
+    [Parameter(Mandatory = true, ParameterSetName = ByIdPath)]
+    [Parameter(Mandatory = true, ParameterSetName = ByConsolePath)]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
-    // todo: fix file input
-    // ref: https://stackoverflow.com/questions/8505294/how-do-i-deal-with-paths-when-writing-a-powershell-cmdlet
-    public FileInfo? FilePath { get; set; }
+    [ValidateNotNullOrEmpty]
+    public string Path
+    {
+        get => _path;
+        set
+        {
+            _shouldExpandPath = true;
+            _path = value;
+        }
+    }
+    
+    [Parameter(Mandatory = true, ParameterSetName = ByIdPathLiteral)]
+    [Parameter(Mandatory = true, ParameterSetName = ByConsolePathLiteral)]
+    [ArgumentCompleter(typeof(ScriptFileCompleter))]
+    [ValidateNotNullOrEmpty]
+    // this is broken due to messy parameter sets
+    public string LiteralPath
+    {
+        get => _path;
+        set => _path = value;
+    }
 
     [Parameter(Position = 2)]
     [Alias("Args")]
@@ -69,11 +102,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     // todo: implement PassThru parameter
 
     [Parameter] [Alias("Visible")] public SwitchParameter ShowWindow { get; set; }
-
-    private const string RequiredPrivilege = "SeDelegateSessionUserImpersonatePrivilege";
-    private const string PowerShellPath    = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
-
-    private PropertyInfo? _propertyInfo;
 
     protected override void BeginProcessing()
     {
@@ -87,33 +115,20 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         //     throw new InvalidOperationException(
         //         "Missing required privilege. You must run this script as SYSTEM or have the SeDelegateSessionUserImpersonatePrivilege token.");
 
-        _propertyInfo = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce",
+        _preserveInvocationInfoOnce = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce",
             BindingFlags.NonPublic | BindingFlags.Instance);
+
+        _sbCommand.AppendFormat(" -WindowStyle {0}", ShowWindow ? "Normal" : "Hidden");
     }
 
     protected override void ProcessRecord()
     {
         if (!ShouldProcess("ScriptBlock")) return;
-
-        StringBuilder sbCommand =
-            new StringBuilder(
-                $"\"{PowerShellPath}\" -ExecutionPolicy Bypass -NoLogo -OutputFormat XML -WindowStyle {(ShowWindow ? "Normal" : "Hidden")}");
-
-        if (ParameterSetName.Equals(ByIdFile))
+        
+        if (MyInvocation.BoundParameters.ContainsKey("ScriptBlock"))
         {
-            // Should probably copy to session's temp, ensuring the user has access to the file.
-            sbCommand.Append($" -File \"{FilePath.FullName}\"");
-
-            if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
-            {
-                string arguments = string.Join(" ", Arguments);
-                sbCommand.Append($" {arguments}");
-            }
-        }
-        else
-        {
-            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(ScriptBlock!.ToString()));
-            sbCommand.Append($" -EncodedCommand {encodedCommand}");
+            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(ScriptBlock.ToString()));
+            _sbCommand.Append($" -EncodedCommand {encodedCommand}");
 
             if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
             {
@@ -122,7 +137,28 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                         Encoding.Unicode.GetBytes(
                             PSSerializer.Serialize(Arguments))
                     );
-                sbCommand.Append($" -EncodedArguments {arguments}");
+                _sbCommand.Append($" -EncodedArguments {arguments}");
+            }
+        }
+        else
+        {
+
+            FileInfo fileInfo;
+            try
+            {
+                fileInfo = GetFileInfoFromPsPath(_path);
+            }
+            catch (Exception e)
+            {
+                throw new PSArgumentException($"Cannot invoke script file because {e.Message.ToLower()}", e);
+            }
+            // todo: ensure target session can read & execute path
+            _sbCommand.Append($" -File \"{fileInfo.FullName}\"");
+
+            if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
+            {
+                string arguments = string.Join(" ", Arguments);
+                _sbCommand.Append($" {arguments}");
             }
         }
 
@@ -146,7 +182,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         if (primaryToken == null || primaryToken.IsInvalid)
             throw new InvalidOperationException("Failed to get a valid session user token.");
-
+        
         using (primaryToken)
         {
             var redirectOptions = ShowWindow
@@ -156,8 +192,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
                 new ProcessExtensions.ProcessOptions
                 {
-                    ApplicationName = PowerShellPath,
-                    CommandLine = sbCommand,
+                    ApplicationName = WindowsPowershellPath,
+                    CommandLine = _sbCommand,
                     Redirect = redirectOptions,
                     WindowStyle = (ushort)(ShowWindow ? 5 : 0)
                 });
@@ -172,7 +208,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             if (err is not null)
                 foreach (var o in err)
                 {
-                    _propertyInfo?.SetValue(o, true);
+                    _preserveInvocationInfoOnce?.SetValue(o, true);
                     WriteError(o);
                 }
 
@@ -193,6 +229,65 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             //         ExitCode = result.ExitCode,
             //     });
         }
+    }
+
+    private FileInfo GetFileInfoFromPsPath(string psPath)
+    {
+        ProviderInfo provider;
+        
+        List<string> filePaths = new List<string>();
+
+        try
+        {
+            if (_shouldExpandPath)
+                filePaths.AddRange(this.GetResolvedProviderPathFromPSPath(psPath, out provider));
+            else
+                filePaths.Add(this.SessionState.Path.GetUnresolvedProviderPathFromPSPath(psPath, out provider, out _));
+        }
+        catch (ItemNotFoundException e)
+        {
+            throw new InvalidOperationException($"Path '{psPath}' does not exist.", e);
+        }
+        
+        switch (filePaths.Count)
+        {
+            case 0:
+                throw new InvalidOperationException($"Path `{psPath}` does not exist.");
+            case > 1:
+                throw new InvalidOperationException($"Path '{psPath}' expanded to multiple files.");
+        }
+        
+        if (!IsFileSystemPath(provider, filePaths.First()))
+            throw new InvalidOperationException($"Path '{filePaths.First()}' is not a FileSystem path.");
+        
+        if (File.Exists(filePaths.First()))
+        {
+            return new FileInfo(filePaths.First());
+        }
+        
+        // This could be a permission issue
+        throw new InvalidOperationException("An unexpected error occurred");
+    }
+
+    private bool IsFileSystemPath(ProviderInfo provider, string path)
+    {
+        bool isFileSystem = true;
+
+        if (provider.ImplementingType != typeof(FileSystemProvider))
+        {
+            // create a .NET exception wrapping our error text
+            ArgumentException ex = new ArgumentException(path +
+                                                         " does not resolve to a path on the FileSystem provider.");
+            // wrap this in a powershell errorrecord
+            ErrorRecord error = new ErrorRecord(ex, "InvalidProvider",
+                ErrorCategory.InvalidArgument, path);
+            // write a non-terminating error to pipeline
+            WriteError(error);
+            // tell our caller that the item was not on the filesystem
+            isFileSystem = false;
+        }
+
+        return isFileSystem;
     }
 }
 
