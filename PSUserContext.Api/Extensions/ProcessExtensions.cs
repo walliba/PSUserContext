@@ -26,7 +26,7 @@ public static class ProcessExtensions
         Error
     }
 
-    // todo: refine options
+    // TODO: refine options
     public sealed class ProcessOptions
     {
         public string?        ApplicationName;
@@ -126,7 +126,7 @@ public static class ProcessExtensions
             fixed (char* pDesktop = @"winsta0\default")
             {
                 startupInfo.lpDesktop = new PWSTR(pDesktop);
-                // todo: refactor this line; i was really tired/lazy when I wrote it
+                // TODO: refactor this line; i was really tired/lazy when I wrote it
                 Span<char> commandLine = options.CommandLine is not null ? new Span<char>(options.CommandLine.ToString().ToCharArray().Append('\0').ToArray()) : null;
                 
                 if (!PInvoke.CreateProcessAsUser(

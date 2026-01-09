@@ -19,7 +19,7 @@ namespace PSUserContext.Cmdlets;
 [OutputType(typeof(UserProcessWithOutputResult))]
 public sealed class InvokeUserContextCommand : PSCmdlet
 {
-    // todo: fix poor ParameterSet strategy
+    // TODO: fix poor ParameterSet strategy
     private const string ById                 = "ById";
     private const string ByConsole            = "ByConsole";
     private const string CommandAct           = "+ScriptBlock";
@@ -97,20 +97,22 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     public string[] Arguments { get; set; } = Array.Empty<string>();
 
     // Attempting to specify -RedirectOutput together with -ShowWindow will result in a parameter binding error.
-    [Parameter] [Alias("Out")] public SwitchParameter RedirectOutput { get; set; }
+    // TODO: remove this parameter. output should be redirected by default unless -ShowWindow is specified
+    [Parameter]
+    [Alias("Out")]
+    public SwitchParameter RedirectOutput { get; set; }
 
-    // todo: implement PassThru parameter
-
-    [Parameter] [Alias("Visible")] public SwitchParameter ShowWindow { get; set; }
+    [Parameter]
+    [Alias("Visible")]
+    public SwitchParameter ShowWindow { get; set; }
 
     protected override void BeginProcessing()
     {
-        // temporary solution until I source generate parameter sets
         if (ShowWindow.IsPresent && RedirectOutput.IsPresent)
             throw new ParameterBindingException(
                 "The parameters -ShowWindow and -RedirectOutput cannot be used together. This is a Win32 limitation.");
 
-        // todo: fix broken api
+        // TODO: fix broken api
         // if (!TokenExtensions.HasTokenPrivilege(RequiredPrivilege))
         //     throw new InvalidOperationException(
         //         "Missing required privilege. You must run this script as SYSTEM or have the SeDelegateSessionUserImpersonatePrivilege token.");
@@ -152,7 +154,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             {
                 throw new PSArgumentException($"Cannot invoke script file because {e.Message.ToLower()}", e);
             }
-            // todo: ensure target session can read & execute path
+            // TODO: ensure target session can read & execute path
             _sbCommand.Append($" -File \"{fileInfo.FullName}\"");
 
             if (MyInvocation.BoundParameters.ContainsKey("Arguments"))

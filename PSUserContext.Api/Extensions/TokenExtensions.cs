@@ -66,7 +66,7 @@ namespace PSUserContext.Api.Extensions
 
 		private static SafeFileHandle DuplicateTokenAsPrimary(SafeHandle hToken)
 		{
-			// todo: should I check token privileges here?
+			// TODO: should I check token privileges here?
 			
 			if (!Windows.Win32.PInvoke.DuplicateTokenEx(hToken, 0, null, Windows.Win32.Security.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Windows.Win32.Security.TOKEN_TYPE.TokenPrimary, out var pDupToken))
 				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Failed to duplicate impersonation token as primary");
@@ -90,7 +90,7 @@ namespace PSUserContext.Api.Extensions
 				
 				for (int i = 0; i < tokenPrivileges.PrivilegeCount; i++)
 				{
-					// todo: read unmanaged array, as this is currently broken
+					// TODO: read unmanaged array, as this is currently broken
 					var info = tokenPrivileges.Privileges[i];
 					
 					uint needed = 0;
@@ -156,7 +156,7 @@ namespace PSUserContext.Api.Extensions
 				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), $"Failed to query user token for session {sessionId}");
 			}
 			
-			// todo: investigate if this using causes issues with the returned handle / make DuplicateTokenAsPrimary handle disposal
+			// TODO: investigate if this using causes issues with the returned handle / make DuplicateTokenAsPrimary handle disposal
 			using (hSessionUserToken)
 			{
 				// First see if the token is the full token or not. If it is a limited token we need to get the
