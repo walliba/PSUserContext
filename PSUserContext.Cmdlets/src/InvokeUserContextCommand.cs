@@ -122,7 +122,9 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         _sbCommand.AppendFormat(" -WindowStyle {0}", ShowWindow ? "Normal" : "Hidden");
     }
-
+    
+    // TODO: experiment with using NamedPipeConnectionInfo instead of parsing CLIXML output directly, similar to Enter-PSHostProcess
+    // ref: https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/remoting/commands/EnterPSHostProcessCommand.cs
     protected override void ProcessRecord()
     {
         if (!ShouldProcess("ScriptBlock")) return;
