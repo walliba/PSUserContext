@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Reflection;
 using System.Text;
 using Microsoft.PowerShell.Commands;
@@ -193,45 +194,33 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                 ? ProcessExtensions.RedirectFlags.None
                 : ProcessExtensions.RedirectFlags.Output | ProcessExtensions.RedirectFlags.Error;
 
-            var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
+            using var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
                 new ProcessExtensions.ProcessOptions
                 {
                     ApplicationName = WindowsPowershellPath,
-                    CommandLine = _sbCommand,
-                    Redirect = redirectOptions,
+                    CommandLine = new StringBuilder(WindowsPowershellPath),
+                    // CommandLine = _sbCommand,
+                    Redirect = ProcessExtensions.RedirectFlags.None,
                     WindowStyle = (ushort)(ShowWindow ? 5 : 0)
                 });
 
-            var output = CliXml.Deserialize(result.StdOutput);
-            var err = CliXml.DeserializeError(result.StdError);
-
-            if (output is not null)
-                foreach (var o in output)
-                    WriteObject(o);
-
-            if (err is not null)
-                foreach (var o in err)
-                {
-                    _preserveInvocationInfoOnce?.SetValue(o, true);
-                    WriteError(o);
-                }
-
-            if (RedirectOutput.IsPresent)
-                WriteObject(new UserProcessWithOutputResult
-                {
-                    ProcessId = result.ProcessId,
-                    SessionId = SessionId,
-                    ExitCode = result.ExitCode,
-                    StandardOutput = result.StdOutput?.ToString() ?? string.Empty,
-                    StandardError = result.StdError?.ToString() ?? string.Empty,
-                });
-            // else
-            //     WriteObject(new UserProcessResult
-            //     {
-            //         ProcessId = result.ProcessId,
-            //         SessionId = SessionId,
-            //         ExitCode = result.ExitCode,
-            //     });
+            NamedPipeConnectionInfo connectionInfo = new NamedPipeConnectionInfo(Convert.ToInt32(result.Pid));
+            
+            try
+            {   
+                using var ps = PowerShell.Create();
+                // TypeTable typeTable = TypeTable.LoadDefaultTypeFiles();
+                using Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo);
+                ps.Runspace = runspace;
+                ps.Runspace.Open();
+                var results = ps.AddScript(ScriptBlock.ToString()).Invoke();
+                WriteObject(results, true);
+                ps.Runspace.Close();
+            }
+            catch (Exception e)
+            {
+                WriteError(new ErrorRecord(e, e.Message, ErrorCategory.InvalidOperation, this));
+            }
         }
     }
 

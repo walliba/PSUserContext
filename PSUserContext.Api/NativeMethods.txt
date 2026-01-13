@@ -21,3 +21,4 @@ ShowWindow
 CreateEnvironmentBlock
 DestroyEnvironmentBlock
 WaitForSingleObject
+TerminateProcess
