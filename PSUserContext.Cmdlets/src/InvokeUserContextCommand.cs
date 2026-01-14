@@ -39,8 +39,9 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     private PropertyInfo? _preserveInvocationInfoOnce;
     private bool          _shouldExpandPath;
     private string        _path = string.Empty;
-
-    private StringBuilder _sbCommand = new ($"\"{WindowsPowershellPath}\" -ExecutionPolicy Bypass -NoLogo -OutputFormat XML");
+    
+    // TODO: append -NonInteractive if the current host does not support interactivity.
+    private StringBuilder _sbCommand = new ($"\"{WindowsPowershellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle Hidden");
 
     /// <summary>
     /// The session ID of the user context to invoke.
@@ -102,17 +103,10 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter]
     [Alias("Out")]
     public SwitchParameter RedirectOutput { get; set; }
-
-    [Parameter]
-    [Alias("Visible")]
-    public SwitchParameter ShowWindow { get; set; }
+    
 
     protected override void BeginProcessing()
     {
-        if (ShowWindow.IsPresent && RedirectOutput.IsPresent)
-            throw new ParameterBindingException(
-                "The parameters -ShowWindow and -RedirectOutput cannot be used together. This is a Win32 limitation.");
-
         // TODO: fix broken api
         // if (!TokenExtensions.HasTokenPrivilege(RequiredPrivilege))
         //     throw new InvalidOperationException(
@@ -120,52 +114,52 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         _preserveInvocationInfoOnce = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce",
             BindingFlags.NonPublic | BindingFlags.Instance);
-
-        _sbCommand.AppendFormat(" -WindowStyle {0}", ShowWindow ? "Normal" : "Hidden");
     }
     
     // TODO: experiment with using NamedPipeConnectionInfo instead of parsing CLIXML output directly, similar to Enter-PSHostProcess
     // ref: https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/remoting/commands/EnterPSHostProcessCommand.cs
     protected override void ProcessRecord()
     {
+        // TODO: properly support ShouldProcess
         if (!ShouldProcess("ScriptBlock")) return;
-        
-        if (MyInvocation.BoundParameters.ContainsKey("ScriptBlock"))
-        {
-            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(ScriptBlock.ToString()));
-            _sbCommand.Append($" -EncodedCommand {encodedCommand}");
-
-            if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
-            {
-                string arguments =
-                    Convert.ToBase64String(
-                        Encoding.Unicode.GetBytes(
-                            PSSerializer.Serialize(Arguments))
-                    );
-                _sbCommand.Append($" -EncodedArguments {arguments}");
-            }
-        }
-        else
-        {
-
-            FileInfo fileInfo;
-            try
-            {
-                fileInfo = GetFileInfoFromPsPath(_path);
-            }
-            catch (Exception e)
-            {
-                throw new PSArgumentException($"Cannot invoke script file because {e.Message.ToLower()}", e);
-            }
-            // TODO: ensure target session can read & execute path
-            _sbCommand.Append($" -File \"{fileInfo.FullName}\"");
-
-            if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
-            {
-                string arguments = string.Join(" ", Arguments);
-                _sbCommand.Append($" {arguments}");
-            }
-        }
+            
+        // TODO: add file support for new runspace method
+        // if (MyInvocation.BoundParameters.ContainsKey("ScriptBlock"))
+        // {
+        //     string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(ScriptBlock.ToString()));
+        //     _sbCommand.Append($" -EncodedCommand {encodedCommand}");
+        //
+        //     if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
+        //     {
+        //         string arguments =
+        //             Convert.ToBase64String(
+        //                 Encoding.Unicode.GetBytes(
+        //                     PSSerializer.Serialize(Arguments))
+        //             );
+        //         _sbCommand.Append($" -EncodedArguments {arguments}");
+        //     }
+        // }
+        // else
+        // {
+        //
+        //     FileInfo fileInfo;
+        //     try
+        //     {
+        //         fileInfo = GetFileInfoFromPsPath(_path);
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         throw new PSArgumentException($"Cannot invoke script file because {e.Message.ToLower()}", e);
+        //     }
+        //     
+        //     _sbCommand.Append($" -File \"{fileInfo.FullName}\"");
+        //
+        //     if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
+        //     {
+        //         string arguments = string.Join(" ", Arguments);
+        //         _sbCommand.Append($" {arguments}");
+        //     }
+        // }
 
         SafeFileHandle primaryToken;
 
@@ -190,27 +184,23 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         
         using (primaryToken)
         {
-            var redirectOptions = ShowWindow
-                ? ProcessExtensions.RedirectFlags.None
-                : ProcessExtensions.RedirectFlags.Output | ProcessExtensions.RedirectFlags.Error;
-
             using var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
                 new ProcessExtensions.ProcessOptions
                 {
                     ApplicationName = WindowsPowershellPath,
-                    CommandLine = new StringBuilder(WindowsPowershellPath),
-                    // CommandLine = _sbCommand,
+                    CommandLine = _sbCommand,
                     Redirect = ProcessExtensions.RedirectFlags.None,
-                    WindowStyle = (ushort)(ShowWindow ? 5 : 0)
+                    WindowStyle = 0
                 });
 
             NamedPipeConnectionInfo connectionInfo = new NamedPipeConnectionInfo(Convert.ToInt32(result.Pid));
             
             try
-            {   
+            {
+                TypeTable typeTable = TypeTable.LoadDefaultTypeFiles();
+                using Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo, this.Host, typeTable);
                 using var ps = PowerShell.Create();
-                // TypeTable typeTable = TypeTable.LoadDefaultTypeFiles();
-                using Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo);
+                
                 ps.Runspace = runspace;
                 ps.Runspace.Open();
                 var results = ps.AddScript(ScriptBlock.ToString()).Invoke();

@@ -40,7 +40,7 @@ class Program
                 ? ProcessExtensions.RedirectFlags.None
                 : ProcessExtensions.RedirectFlags.Output | ProcessExtensions.RedirectFlags.Error;
 
-            var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
+            using var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
                 new ProcessExtensions.ProcessOptions
                 {
                     ApplicationName = PowerShellPath,
@@ -56,7 +56,7 @@ class Program
             
             Console.WriteLine("Process Id: {0}", result.Pid);
             
-            NamedPipeConnectionInfo connectionInfo = new NamedPipeConnectionInfo(Convert.ToInt32(result.Pid));
+            NamedPipeConnectionInfo? connectionInfo = new NamedPipeConnectionInfo(Convert.ToInt32(result.Pid));
             
             var ps = PowerShell.Create();
             try
@@ -65,14 +65,15 @@ class Program
                 
                 runspace.Open();
                 ps.Runspace = runspace;
-                var results = ps.AddScript("whoami; exit").Invoke();
+                var results = ps.AddScript("whoami").Invoke();
                 foreach (PSObject obj in results)
                 {
                     Console.WriteLine("{0}", obj);
                 }
                     
                 runspace.Close();
-                result.Dispose();
+                connectionInfo = null;
+                Console.ReadLine();
             }
             catch (Exception e)
             {
