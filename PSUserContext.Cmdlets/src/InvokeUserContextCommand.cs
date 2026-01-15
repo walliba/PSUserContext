@@ -43,7 +43,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     private PropertyInfo? _preserveInvocationInfoOnce;
     private bool          _shouldExpandPath;
     private string        _path      = string.Empty;
-    private uint          _sessionId = uint.MaxValue;
+    private uint          _sessionId;
 
     // TODO: append -NonInteractive if the current host does not support interactivity.
     // https://github.com/PowerShell/PowerShell/blob/master/src/Microsoft.PowerShell.ConsoleHost/host/msh/ConsoleHost.cs
@@ -60,6 +60,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         ParameterSetName = ByIdCommand)]
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
         ParameterSetName = ByIdPath)]
+    [ValidateNotNullOrEmpty]
     public uint SessionId
     {
         get => _sessionId;
@@ -117,20 +118,10 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         // if (!TokenExtensions.HasTokenPrivilege(RequiredPrivilege))
         //     throw new InvalidOperationException(
         //         "Missing required privilege. You must run this script as SYSTEM or have the SeDelegateSessionUserImpersonatePrivilege token.");
-
-        _preserveInvocationInfoOnce = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce",
-            BindingFlags.NonPublic | BindingFlags.Instance);
-    }
-
-    // TODO: experiment with using NamedPipeConnectionInfo instead of parsing CLIXML output directly, similar to Enter-PSHostProcess
-    // ref: https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/remoting/commands/EnterPSHostProcessCommand.cs
-    protected override void ProcessRecord()
-    {
-        // TODO: properly support ShouldProcess
-        if (!ShouldProcess("ScriptBlock")) return;
-
+        
         if (Console.IsPresent)
         {
+            WriteVerbose("Using active console session.");
             uint? consoleId = SessionExtensions.GetConsoleSessionId();
 
             if (consoleId is null)
@@ -140,6 +131,21 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
             _sessionId = consoleId.Value;
         }
+        
+        _preserveInvocationInfoOnce = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        // check if sessionId is set. 0 is a safe default as this Cmdlet is not intended to invoke system space contexts
+        if (_sessionId == 0)
+            throw new PSArgumentException("Session ID must be specified.");
+    }
+
+    // TODO: experiment with using NamedPipeConnectionInfo instead of parsing CLIXML output directly, similar to Enter-PSHostProcess
+    // ref: https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/remoting/commands/EnterPSHostProcessCommand.cs
+    protected override void ProcessRecord()
+    {
+        // TODO: properly support ShouldProcess
+        if (!ShouldProcess("ScriptBlock")) return;
 
         using var result = ProcessExtensions.CreateProcessAsUser(_sessionId,
             new ProcessExtensions.ProcessOptions
