@@ -72,7 +72,7 @@ public static class ProcessExtensions
         }, token);
     }
 
-    public static unsafe ProcessJob CreateProcessAsUser(SafeFileHandle userToken, ProcessOptions options)
+    internal static unsafe ProcessJob CreateProcessAsUser(SafeFileHandle userToken, ProcessOptions options)
     {
         var securityAttribute = new SECURITY_ATTRIBUTES
         {
@@ -80,25 +80,6 @@ public static class ProcessExtensions
             lpSecurityDescriptor = null,
             bInheritHandle = true
         };
-
-        // using NamedPipeServerStream pipeServer = new NamedPipeServerStream("psusercontext", PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-        
-        // if (!PInvoke.CreatePipe(out var outRead, out var outWrite, securityAttribute, 4096))
-        //     throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "failed to create output pipe");
-        // if (!PInvoke.CreatePipe(out var errRead, out var errWrite, securityAttribute, 4096))
-        //     throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "failed to create error pipe");
-        // if (!PInvoke.SetHandleInformation(outRead, (uint)HANDLE_FLAGS.HANDLE_FLAG_INHERIT, 0))
-        //     throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),
-        //         "failed to set out read handle information");
-        // if (!PInvoke.SetHandleInformation(errRead, (uint)HANDLE_FLAGS.HANDLE_FLAG_INHERIT, 0))
-        //     throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),
-        //         "failed to set err read handle information");
-        // if (!PInvoke.SetHandleInformation(outWrite, (uint)HANDLE_FLAGS.HANDLE_FLAG_INHERIT, HANDLE_FLAGS.HANDLE_FLAG_INHERIT))
-        //     throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),
-        //         "failed to set out write handle info");
-        // if (!PInvoke.SetHandleInformation(errWrite, (uint)HANDLE_FLAGS.HANDLE_FLAG_INHERIT, HANDLE_FLAGS.HANDLE_FLAG_INHERIT))
-        //     throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),
-        //         "failed to set err write handle info");
 
         PROCESS_INFORMATION processInfo;
 
@@ -182,6 +163,16 @@ public static class ProcessExtensions
 
         // return new UserProcessResult(processInfo.dwProcessId, exitCode, stdOutTask.GetAwaiter().GetResult(),
         //     stdErrTask.GetAwaiter().GetResult());
+    }
+
+    public static ProcessJob CreateProcessAsUser(uint sessionId, ProcessOptions options)
+    {
+        using var primaryToken = TokenExtensions.GetSessionUserToken(sessionId);
+        
+        if (primaryToken == null || primaryToken.IsInvalid)
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Failed to get a valid session user token.");
+        
+        return CreateProcessAsUser(primaryToken, options);
     }
     
 }

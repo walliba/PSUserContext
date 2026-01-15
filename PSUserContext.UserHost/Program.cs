@@ -18,14 +18,14 @@ class Program
         bool showWindow = true;
         const string PowerShellPath    = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
         
-        var consoleId = SessionExtensions.GetActiveConsoleSession();
+        var consoleId = SessionExtensions.GetConsoleSessionId();
         
         if (consoleId is null)
         {
             throw new InvalidOperationException("No active console session found.");
         }
         
-        var primaryToken = TokenExtensions.GetSessionUserToken(consoleId, false);
+        var primaryToken = TokenExtensions.GetSessionUserToken(consoleId.Value, false);
         
         if (primaryToken == null || primaryToken.IsInvalid)
             throw new InvalidOperationException("Failed to get a valid session user token.");
@@ -40,7 +40,7 @@ class Program
                 ? ProcessExtensions.RedirectFlags.None
                 : ProcessExtensions.RedirectFlags.Output | ProcessExtensions.RedirectFlags.Error;
 
-            using var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
+            using var result = ProcessExtensions.CreateProcessAsUser(consoleId.Value,
                 new ProcessExtensions.ProcessOptions
                 {
                     ApplicationName = PowerShellPath,

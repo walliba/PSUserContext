@@ -14,7 +14,7 @@ namespace PSUserContext.Api.Extensions
 {
 	public static class SessionExtensions
 	{
-		public const uint INVALID_SESSION_ID = 0xFFFFFFFF;
+		internal const uint INVALID_SESSION_ID = 0xFFFFFFFF;
 		
 		public static bool IsTokenValid(this UserContextInfo ctx)
 		{
@@ -29,6 +29,11 @@ namespace PSUserContext.Api.Extensions
 		
 		private static bool IsNonInteractiveState(this WtsSessionState state) =>
 			state is WtsSessionState.Listen or WtsSessionState.Down or WtsSessionState.Init or WtsSessionState.Reset;
+
+		public static uint? GetConsoleSessionId()
+		{
+			return GetActiveConsoleSessionId();
+		}
 		
 		internal static uint? GetActiveConsoleSessionId()
 		{

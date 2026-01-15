@@ -1,15 +1,20 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using System.Text;
+using System.Threading;
 using Microsoft.PowerShell.Commands;
 using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
+using PSUserContext.Cmdlets.Helpers;
 
 namespace PSUserContext.Cmdlets;
 
@@ -37,11 +42,13 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
     private PropertyInfo? _preserveInvocationInfoOnce;
     private bool          _shouldExpandPath;
-    private string        _path = string.Empty;
-    
+    private string        _path      = string.Empty;
+    private uint          _sessionId = uint.MaxValue;
+
     // TODO: append -NonInteractive if the current host does not support interactivity.
     // https://github.com/PowerShell/PowerShell/blob/master/src/Microsoft.PowerShell.ConsoleHost/host/msh/ConsoleHost.cs
-    private StringBuilder _sbCommand = new ($"\"{WindowsPowershellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle Hidden -NamedPipeServerMode");
+    private StringBuilder _sbCommand =
+        new($"\"{WindowsPowershellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle Hidden -NamedPipeServerMode");
 
     /// <summary>
     /// The session ID of the user context to invoke.
@@ -53,7 +60,11 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         ParameterSetName = ByIdCommand)]
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
         ParameterSetName = ByIdPath)]
-    public uint SessionId { get; set; }
+    public uint SessionId
+    {
+        get => _sessionId;
+        set => _sessionId = value;
+    }
 
     /// <summary>
     /// When specified, invokes the active console session.
@@ -73,6 +84,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter(Mandatory = true, ParameterSetName = ByConsolePath)]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
     [ValidateNotNullOrEmpty]
+    // TODO: add file support for new runspace method
+    // currently broken
     public string Path
     {
         get => _path;
@@ -82,12 +95,12 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             _path = value;
         }
     }
-    
+
     [Parameter(Mandatory = true, ParameterSetName = ByIdPathLiteral)]
     [Parameter(Mandatory = true, ParameterSetName = ByConsolePathLiteral)]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
     [ValidateNotNullOrEmpty]
-    // this is broken due to messy parameter sets
+    // currently broken
     public string LiteralPath
     {
         get => _path;
@@ -97,7 +110,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter(Position = 2)]
     [Alias("Args")]
     public string[] Arguments { get; set; } = Array.Empty<string>();
-    
 
     protected override void BeginProcessing()
     {
@@ -109,109 +121,99 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         _preserveInvocationInfoOnce = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce",
             BindingFlags.NonPublic | BindingFlags.Instance);
     }
-    
+
     // TODO: experiment with using NamedPipeConnectionInfo instead of parsing CLIXML output directly, similar to Enter-PSHostProcess
     // ref: https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/remoting/commands/EnterPSHostProcessCommand.cs
     protected override void ProcessRecord()
     {
         // TODO: properly support ShouldProcess
         if (!ShouldProcess("ScriptBlock")) return;
-            
-        // TODO: add file support for new runspace method
-        // if (MyInvocation.BoundParameters.ContainsKey("ScriptBlock"))
-        // {
-        //     string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(ScriptBlock.ToString()));
-        //     _sbCommand.Append($" -EncodedCommand {encodedCommand}");
-        //
-        //     if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
-        //     {
-        //         string arguments =
-        //             Convert.ToBase64String(
-        //                 Encoding.Unicode.GetBytes(
-        //                     PSSerializer.Serialize(Arguments))
-        //             );
-        //         _sbCommand.Append($" -EncodedArguments {arguments}");
-        //     }
-        // }
-        // else
-        // {
-        //
-        //     FileInfo fileInfo;
-        //     try
-        //     {
-        //         fileInfo = GetFileInfoFromPsPath(_path);
-        //     }
-        //     catch (Exception e)
-        //     {
-        //         throw new PSArgumentException($"Cannot invoke script file because {e.Message.ToLower()}", e);
-        //     }
-        //     
-        //     _sbCommand.Append($" -File \"{fileInfo.FullName}\"");
-        //
-        //     if (MyInvocation.BoundParameters.ContainsKey("Arguments"))
-        //     {
-        //         string arguments = string.Join(" ", Arguments);
-        //         _sbCommand.Append($" {arguments}");
-        //     }
-        // }
-
-        SafeFileHandle primaryToken;
 
         if (Console.IsPresent)
         {
-            var consoleId = SessionExtensions.GetActiveConsoleSession();
+            uint? consoleId = SessionExtensions.GetConsoleSessionId();
 
             if (consoleId is null)
             {
-                throw new InvalidOperationException("No active console session found.");
+                throw new ItemNotFoundException("No active console session found.");
             }
 
-            primaryToken = TokenExtensions.GetSessionUserToken(consoleId, false);
-        }
-        else
-        {
-            primaryToken = TokenExtensions.GetSessionUserToken(SessionId, false);
+            _sessionId = consoleId.Value;
         }
 
-        if (primaryToken == null || primaryToken.IsInvalid)
-            throw new InvalidOperationException("Failed to get a valid session user token.");
-        
-        using (primaryToken)
-        {
-            using var result = ProcessExtensions.CreateProcessAsUser(primaryToken,
-                new ProcessExtensions.ProcessOptions
-                {
-                    ApplicationName = WindowsPowershellPath,
-                    CommandLine = _sbCommand,
-                    Redirect = ProcessExtensions.RedirectFlags.None,
-                    WindowStyle = 0
-                });
+        using var result = ProcessExtensions.CreateProcessAsUser(_sessionId,
+            new ProcessExtensions.ProcessOptions
+            {
+                ApplicationName = WindowsPowershellPath,
+                CommandLine = _sbCommand,
+                Redirect = ProcessExtensions.RedirectFlags.None,
+                WindowStyle = 0
+            });
 
-            NamedPipeConnectionInfo connectionInfo = new NamedPipeConnectionInfo(Convert.ToInt32(result.Pid));
+        NamedPipeConnectionInfo connectionInfo = new NamedPipeConnectionInfo(Convert.ToInt32(result.Pid));
+
+        try
+        {
+            TypeTable typeTable = TypeTable.LoadDefaultTypeFiles();
+            using Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo, this.Host, typeTable);
+            using var ps = PowerShell.Create();
             
-            try
+            ps.Streams.Error.DataAdded += (sender, args) =>
             {
-                TypeTable typeTable = TypeTable.LoadDefaultTypeFiles();
-                using Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo, this.Host, typeTable);
-                using var ps = PowerShell.Create();
+                var errors = (PSDataCollection<ErrorRecord>)sender;
+                var e = errors[args.Index];
+
+                if (e is { Exception: RemoteException re })
+                {
+                    e = re.ErrorRecord;
+                    _preserveInvocationInfoOnce?.SetValue(e, true);
+                }
                 
-                ps.Runspace = runspace;
-                ps.Runspace.Open();
-                var results = ps.AddScript(ScriptBlock.ToString()).Invoke();
-                WriteObject(results, true);
-                ps.Runspace.Close();
-            }
-            catch (Exception e)
+                EnqueueStream(() => WriteError(e));
+            };
+            
+            var output = new PSDataCollection<PSObject>();
+
+            output.DataAdded += (sender, args) =>
             {
-                WriteError(new ErrorRecord(e, e.Message, ErrorCategory.InvalidOperation, this));
-            }
+                var outputs = (PSDataCollection<PSObject>)sender;
+                var o = outputs[args.Index];
+
+                EnqueueStream(() => WriteObject(o));
+            };
+            
+            ps.Runspace = runspace;
+            ps.Runspace.Open();
+            ps.AddScript(ScriptBlock.ToString()).Invoke(input: null, output: output);
+
+            DrainStream();
+            ps.Runspace.Close();
         }
+        catch (Exception e)
+        {
+            WriteError(new ErrorRecord(e, e.Message, ErrorCategory.InvalidOperation, this));
+        } 
+    }
+
+    private long _seq;
+    private readonly ConcurrentQueue<(long seq, Action emit)> _queue = new();
+
+    private void EnqueueStream(Action emit)
+    {
+        var s = Interlocked.Increment(ref _seq);
+        _queue.Enqueue((s, emit));
+    }
+
+    private void DrainStream()
+    {
+        while (_queue.TryDequeue(out var item))
+            item.emit();
     }
 
     private FileInfo GetFileInfoFromPsPath(string psPath)
     {
         ProviderInfo provider;
-        
+
         List<string> filePaths = new List<string>();
 
         try
@@ -225,7 +227,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         {
             throw new InvalidOperationException($"Path '{psPath}' does not exist.", e);
         }
-        
+
         switch (filePaths.Count)
         {
             case 0:
@@ -233,15 +235,15 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             case > 1:
                 throw new InvalidOperationException($"Path '{psPath}' expanded to multiple files.");
         }
-        
+
         if (!IsFileSystemPath(provider, filePaths.First()))
             throw new InvalidOperationException($"Path '{filePaths.First()}' is not a FileSystem path.");
-        
+
         if (File.Exists(filePaths.First()))
         {
             return new FileInfo(filePaths.First());
         }
-        
+
         // This could be a permission issue
         throw new InvalidOperationException("An unexpected error occurred");
     }
@@ -272,7 +274,7 @@ public class UserProcessResult
 {
     public uint ProcessId { get; set; }
     public uint SessionId { get; set; }
-    public uint ExitCode  { get; set; }
+    public uint ExitCode { get; set; }
 
     public override string ToString()
     {
@@ -283,5 +285,5 @@ public class UserProcessResult
 public class UserProcessWithOutputResult : UserProcessResult
 {
     public string StandardOutput { get; set; } = string.Empty;
-    public string StandardError  { get; set; } = string.Empty;
+    public string StandardError { get; set; } = string.Empty;
 }

@@ -5,7 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 using Windows.Win32;
-using Windows.Win32.Foundation;
 using Windows.Win32.Security;
 
 namespace PSUserContext.Api.Extensions
@@ -68,13 +67,13 @@ namespace PSUserContext.Api.Extensions
 		{
 			// TODO: should I check token privileges here?
 			
-			if (!Windows.Win32.PInvoke.DuplicateTokenEx(hToken, 0, null, Windows.Win32.Security.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Windows.Win32.Security.TOKEN_TYPE.TokenPrimary, out var pDupToken))
+			if (!PInvoke.DuplicateTokenEx(hToken, 0, null, SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, TOKEN_TYPE.TokenPrimary, out var pDupToken))
 				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Failed to duplicate impersonation token as primary");
 
 			return pDupToken;
 		}
 
-		private static unsafe Dictionary<String, TOKEN_PRIVILEGES_ATTRIBUTES> GetTokenPrivileges()
+		private static Dictionary<String, TOKEN_PRIVILEGES_ATTRIBUTES> GetTokenPrivileges()
 		{
 			Dictionary<string, TOKEN_PRIVILEGES_ATTRIBUTES> privileges = new Dictionary<string, TOKEN_PRIVILEGES_ATTRIBUTES>();
 			
@@ -130,7 +129,7 @@ namespace PSUserContext.Api.Extensions
 
 			// Find the active session that matches the given username and pass its session id to the other overload
 			var match = sessions.FirstOrDefault(s =>
-				s.UserName.Equals(username, StringComparison.OrdinalIgnoreCase)
+				s.UserName != null && s.UserName.Equals(username, StringComparison.OrdinalIgnoreCase)
 			);
 
 			if (match is null)
@@ -139,11 +138,11 @@ namespace PSUserContext.Api.Extensions
 			return GetSessionUserToken(match.Id, elevated);
 		}
 
-		public static unsafe SafeFileHandle GetSessionUserToken(uint sessionId, bool elevated = false)
+		public static SafeFileHandle GetSessionUserToken(uint sessionId, bool elevated = false)
 		{
-			if (sessionId == SessionExtensions.INVALID_SESSION_ID)
-				sessionId = SessionExtensions.GetActiveConsoleSessionId()
-					?? throw new InvalidOperationException("No active console session found. This typically occurs when no user is logged in.");
+			// if (sessionId == SessionExtensions.INVALID_SESSION_ID)
+			// 	sessionId = SessionExtensions.GetActiveConsoleSessionId()
+			// 		?? throw new InvalidOperationException("No active console session found. This typically occurs when no user is logged in.");
 			
 			
 			if (!PInvoke.WTSQueryUserToken(sessionId, out var hSessionUserToken))
