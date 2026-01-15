@@ -50,8 +50,8 @@ public sealed class ProcessJob : IDisposable
             // ignore
         }
         
-        if (!PInvoke.TerminateProcess(_hProcess, 0))
-            Console.WriteLine("Failed to terminate process handle");
+        // Since PowerShell is ran with -NamedPipeServerMode, TerminateProcess is no longer required.
+        // TODO: add sanity check?
         
         if (!PInvoke.CloseHandle(_hProcess))
             Console.WriteLine("Failed to close process handle");

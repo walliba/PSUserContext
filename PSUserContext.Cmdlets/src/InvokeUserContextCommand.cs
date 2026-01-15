@@ -10,7 +10,6 @@ using Microsoft.PowerShell.Commands;
 using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
-using PSUserContext.Cmdlets.Helpers;
 
 namespace PSUserContext.Cmdlets;
 
@@ -41,7 +40,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     private string        _path = string.Empty;
     
     // TODO: append -NonInteractive if the current host does not support interactivity.
-    private StringBuilder _sbCommand = new ($"\"{WindowsPowershellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle Hidden");
+    // https://github.com/PowerShell/PowerShell/blob/master/src/Microsoft.PowerShell.ConsoleHost/host/msh/ConsoleHost.cs
+    private StringBuilder _sbCommand = new ($"\"{WindowsPowershellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle Hidden -NamedPipeServerMode");
 
     /// <summary>
     /// The session ID of the user context to invoke.
@@ -97,12 +97,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter(Position = 2)]
     [Alias("Args")]
     public string[] Arguments { get; set; } = Array.Empty<string>();
-
-    // Attempting to specify -RedirectOutput together with -ShowWindow will result in a parameter binding error.
-    // TODO: remove this parameter. output should be redirected by default unless -ShowWindow is specified
-    [Parameter]
-    [Alias("Out")]
-    public SwitchParameter RedirectOutput { get; set; }
     
 
     protected override void BeginProcessing()
