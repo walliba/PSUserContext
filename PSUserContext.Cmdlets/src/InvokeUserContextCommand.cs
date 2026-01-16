@@ -44,7 +44,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     // TODO: append -NonInteractive if the current host does not support interactivity.
     // https://github.com/PowerShell/PowerShell/blob/master/src/Microsoft.PowerShell.ConsoleHost/host/msh/ConsoleHost.cs
     private StringBuilder _sbCommand =
-        new($"\"{WindowsPowershellPath}\" -ExecutionPolicy Bypass -NoLogo -WindowStyle Hidden -NamedPipeServerMode");
+        new($"\"{WindowsPowershellPath}\" -ExecutionPolicy RemoteSigned -NoLogo -NoProfile -WindowStyle Hidden -NamedPipeServerMode");
 
     /// <summary>
     /// The session ID of the user context to invoke.
@@ -155,6 +155,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         {
             TypeTable typeTable = TypeTable.LoadDefaultTypeFiles();
             using Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo, this.Host, typeTable);
+            Runspace.DefaultRunspace.Debugger.SetDebugMode(DebugModes.None);
             using var ps = PowerShell.Create();
 
             ps.Streams.Error.DataAdded += (sender, args) =>
