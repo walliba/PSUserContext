@@ -6,15 +6,11 @@ using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using Microsoft.PowerShell.Commands;
-using Microsoft.Win32.SafeHandles;
 using PSUserContext.Api.Extensions;
 using PSUserContext.Cmdlets.Completers;
-using PSUserContext.Cmdlets.Helpers;
 
 namespace PSUserContext.Cmdlets;
 
@@ -25,25 +21,25 @@ namespace PSUserContext.Cmdlets;
 public sealed class InvokeUserContextCommand : PSCmdlet
 {
     // TODO: fix poor ParameterSet strategy
-    private const string ById                 = "ById";
-    private const string ByConsole            = "ByConsole";
-    private const string CommandAct           = "+ScriptBlock";
-    private const string PathAct              = "+Path";
-    private const string LiteralPathAct       = "+LiteralPath";
-    private const string ByIdCommand          = ById + CommandAct;
-    private const string ByIdPath             = ById + PathAct;
-    private const string ByIdPathLiteral      = ByIdPath + LiteralPathAct;
-    private const string ByConsoleCommand     = ByConsole + CommandAct;
-    private const string ByConsolePath        = ByConsole + PathAct;
+    private const string ById = "ById";
+    private const string ByConsole = "ByConsole";
+    private const string CommandAct = "+ScriptBlock";
+    private const string PathAct = "+Path";
+    private const string LiteralPathAct = "+LiteralPath";
+    private const string ByIdCommand = ById + CommandAct;
+    private const string ByIdPath = ById + PathAct;
+    private const string ByIdPathLiteral = ByIdPath + LiteralPathAct;
+    private const string ByConsoleCommand = ByConsole + CommandAct;
+    private const string ByConsolePath = ByConsole + PathAct;
     private const string ByConsolePathLiteral = ByConsole + LiteralPathAct;
 
-    private const string RequiredPrivilege     = "SeDelegateSessionUserImpersonatePrivilege";
+    private const string RequiredPrivilege = "SeDelegateSessionUserImpersonatePrivilege";
     private const string WindowsPowershellPath = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
 
     private PropertyInfo? _preserveInvocationInfoOnce;
-    private bool          _shouldExpandPath;
-    private string        _path      = string.Empty;
-    private uint          _sessionId;
+    private bool _shouldExpandPath;
+    private string _path = string.Empty;
+    private uint _sessionId;
 
     // TODO: append -NonInteractive if the current host does not support interactivity.
     // https://github.com/PowerShell/PowerShell/blob/master/src/Microsoft.PowerShell.ConsoleHost/host/msh/ConsoleHost.cs
@@ -114,11 +110,10 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
     protected override void BeginProcessing()
     {
-        // TODO: fix broken api
-        // if (!TokenExtensions.HasTokenPrivilege(RequiredPrivilege))
-        //     throw new InvalidOperationException(
-        //         "Missing required privilege. You must run this script as SYSTEM or have the SeDelegateSessionUserImpersonatePrivilege token.");
-        
+        if (!TokenExtensions.HasTokenPrivilege(RequiredPrivilege))
+            throw new InvalidOperationException(
+                "Missing required privilege. You must run this script as SYSTEM or have the SeDelegateSessionUserImpersonatePrivilege token.");
+
         if (Console.IsPresent)
         {
             WriteVerbose("Using active console session.");
@@ -131,17 +126,15 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
             _sessionId = consoleId.Value;
         }
-        
+
         _preserveInvocationInfoOnce = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce",
             BindingFlags.NonPublic | BindingFlags.Instance);
-        
+
         // check if sessionId is set. 0 is a safe default as this Cmdlet is not intended to invoke system space contexts
         if (_sessionId == 0)
             throw new PSArgumentException("Session ID must be specified.");
     }
 
-    // TODO: experiment with using NamedPipeConnectionInfo instead of parsing CLIXML output directly, similar to Enter-PSHostProcess
-    // ref: https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/remoting/commands/EnterPSHostProcessCommand.cs
     protected override void ProcessRecord()
     {
         // TODO: properly support ShouldProcess
@@ -163,7 +156,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             TypeTable typeTable = TypeTable.LoadDefaultTypeFiles();
             using Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo, this.Host, typeTable);
             using var ps = PowerShell.Create();
-            
+
             ps.Streams.Error.DataAdded += (sender, args) =>
             {
                 var errors = (PSDataCollection<ErrorRecord>)sender;
@@ -174,10 +167,10 @@ public sealed class InvokeUserContextCommand : PSCmdlet
                     e = re.ErrorRecord;
                     _preserveInvocationInfoOnce?.SetValue(e, true);
                 }
-                
+
                 EnqueueStream(() => WriteError(e));
             };
-            
+
             var output = new PSDataCollection<PSObject>();
 
             output.DataAdded += (sender, args) =>
@@ -187,7 +180,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
                 EnqueueStream(() => WriteObject(o));
             };
-            
+
             ps.Runspace = runspace;
             ps.Runspace.Open();
             ps.AddScript(ScriptBlock.ToString()).Invoke(input: null, output: output);
@@ -198,7 +191,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         catch (Exception e)
         {
             WriteError(new ErrorRecord(e, e.Message, ErrorCategory.InvalidOperation, this));
-        } 
+        }
     }
 
     private long _seq;
