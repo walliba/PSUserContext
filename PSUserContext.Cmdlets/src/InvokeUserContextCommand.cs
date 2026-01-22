@@ -39,7 +39,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     private PropertyInfo? _preserveInvocationInfoOnce;
     private bool _shouldExpandPath;
     private string _path = string.Empty;
-    private uint _sessionId;
+    private uint _sessionId = UInt32.MaxValue;
 
     // TODO: append -NonInteractive if the current host does not support interactivity.
     // https://github.com/PowerShell/PowerShell/blob/master/src/Microsoft.PowerShell.ConsoleHost/host/msh/ConsoleHost.cs
@@ -132,7 +132,10 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         // check if sessionId is set. 0 is a safe default as this Cmdlet is not intended to invoke system space contexts
         if (_sessionId == 0)
-            throw new PSArgumentException("Session ID must be specified.");
+            throw new PSArgumentException("Session ID 0 is reserved for system services; specify an interactive session ID instead.");
+        
+        if (_sessionId == UInt32.MaxValue)
+            throw new PSArgumentException("Session ID is not valid.");
     }
 
     protected override void ProcessRecord()
