@@ -141,7 +141,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             throw new PSArgumentException("Session ID is not valid.");
         
         // TODO: properly support ShouldProcess
-        if (!ShouldProcess($"session {_sessionId}", "creating powershell process")) return;
+        if (!ShouldProcess($"session {_sessionId}", $"executing {(MyInvocation.BoundParameters.ContainsKey("ScriptBlock") ? "scriptblock" : "file")}")) return;
 
         using var result = ProcessExtensions.CreateProcessAsUser(_sessionId,
             new ProcessExtensions.ProcessOptions
