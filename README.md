@@ -18,6 +18,11 @@ With PSUserContext, you can trigger user-specific updates such as:
 Get-UserContext -Console | Invoke-UserContext -ScriptBlock {gpupdate /target:user /force}
 ```
 
+### 2. Empty recycle bin for all active sessions
+```powershell
+Get-UserContext | Invoke-UserContext -ScriptBlock {Clear-RecycleBin -Force}
+```
+
 ## Planned Features
 
 - [ ] Deserialized output with interactable objects
