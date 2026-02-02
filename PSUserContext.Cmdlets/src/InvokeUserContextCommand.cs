@@ -129,19 +129,19 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         _preserveInvocationInfoOnce = typeof(ErrorRecord).GetProperty("PreserveInvocationInfoOnce",
             BindingFlags.NonPublic | BindingFlags.Instance);
+    }
 
+    protected override void ProcessRecord()
+    {
         // check if sessionId is set. 0 is a safe default as this Cmdlet is not intended to invoke system space contexts
         if (_sessionId == 0)
             throw new PSArgumentException("Session ID 0 is reserved for system services; specify an interactive session ID instead.");
         
         if (_sessionId == UInt32.MaxValue)
             throw new PSArgumentException("Session ID is not valid.");
-    }
-
-    protected override void ProcessRecord()
-    {
+        
         // TODO: properly support ShouldProcess
-        if (!ShouldProcess("ScriptBlock")) return;
+        if (!ShouldProcess($"session {_sessionId}", "creating powershell process")) return;
 
         using var result = ProcessExtensions.CreateProcessAsUser(_sessionId,
             new ProcessExtensions.ProcessOptions
