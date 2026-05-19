@@ -8,23 +8,26 @@ using System.Management.Automation.Language;
 
 namespace PSUserContext.Cmdlets.Completers;
 
-public class ScriptFileCompleter : IArgumentCompleter
+public sealed class ScriptFileCompleter : IArgumentCompleter
 {
     public IEnumerable<CompletionResult> CompleteArgument(
-        string      commandName,
-        string      parameterName,
-        string      wordToComplete,
-        CommandAst  commandAst,
+        string commandName,
+        string parameterName,
+        string wordToComplete,
+        CommandAst commandAst,
         IDictionary fakeBoundParameters)
     {
-        string? dir = Path.GetDirectoryName(wordToComplete);
+        return CompletionCompleters
+            .CompleteFilename(wordToComplete)
+            .Where(result =>
+                result.ResultType == CompletionResultType.ProviderContainer ||
+                IsPowerShellScript(result.CompletionText));
+    }
 
-        if (string.IsNullOrEmpty(dir)) dir = Environment.CurrentDirectory;
+    private static bool IsPowerShellScript(string completionText)
+    {
+        string text = completionText.Trim('\'', '"');
 
-        string pattern = Path.GetFileName(wordToComplete) + "*.ps1";
-
-        return Directory.EnumerateFiles(dir, pattern)
-            .Select(f => new CompletionResult(f))
-            .ToArray();
+        return text.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase);
     }
 }
