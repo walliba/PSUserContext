@@ -11,11 +11,15 @@ This module provides fine-grained control over executing processes and scripts a
 
 ## Use Case
 
+This module **MUST** be ran as `NT AUTHORITY\SYSTEM` or from an account with the `SeDelegateSessionUserImpersonatePrivilege` privilege.
+
+A typical scenario is running from an RMM tool which executes under SYSTEM, or by using PsExec.
+
 ### 1. Refreshing Group Policy in a User Session
 System or RMM tasks often run under the **SYSTEM** account and can’t directly interact with the logged-on user’s environment.  
 With PSUserContext, you can trigger user-specific updates such as:
 ```powershell
-Get-UserContext -Console | Invoke-UserContext -ScriptBlock {gpupdate /target:user /force}
+Invoke-UserContext -Console -ScriptBlock {gpupdate /target:user /force}
 ```
 
 ### 2. Empty recycle bin for all active sessions
@@ -25,7 +29,7 @@ Get-UserContext | Invoke-UserContext -ScriptBlock {Clear-RecycleBin -Force}
 
 ## Planned Features
 
-- [ ] Deserialized output with interactable objects
+- [x] Deserialized output with interactable objects
 - [ ] Asynchronous batch execution across multiple sessions
 - [ ] Centralized and structured logging
 
