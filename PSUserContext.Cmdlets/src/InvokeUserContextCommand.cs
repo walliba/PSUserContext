@@ -63,11 +63,11 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     /// <remarks>
     ///     Session ID can be located with the native <c>quser</c> command and the <c>Get-UserContext</c> cmdlet.
     /// </remarks>
-    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
+    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
         ParameterSetName = ByIdUsingScriptBlock)]
-    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
+    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
         ParameterSetName = ByIdUsingPath)]
-    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
+    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
         ParameterSetName = ByIdUsingLiteralPath)]
     [ValidateNotNullOrEmpty]
     public uint SessionId { get; set; } = uint.MaxValue;
@@ -84,8 +84,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter(Mandatory = true, ParameterSetName = ByConsoleUsingLiteralPath)]
     public SwitchParameter Console { get; set; }
 
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByIdUsingScriptBlock)]
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ByConsoleUsingScriptBlock)]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByIdUsingScriptBlock)]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByConsoleUsingScriptBlock)]
     public ScriptBlock ScriptBlock
     {
         get => _scriptBlock;
@@ -96,12 +96,10 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         }
     }
 
-    [Parameter(Mandatory = true, ParameterSetName = ByIdUsingPath)]
-    [Parameter(Mandatory = true, ParameterSetName = ByConsoleUsingPath)]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByIdUsingPath)]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByConsoleUsingPath)]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
     [ValidateNotNullOrEmpty]
-    // TODO: add file support for new runspace method
-    // currently broken
     public string Path
     {
         get => _filePath;
@@ -112,11 +110,10 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         }
     }
 
-    [Parameter(Mandatory = true, ParameterSetName = ByIdUsingLiteralPath)]
-    [Parameter(Mandatory = true, ParameterSetName = ByConsoleUsingLiteralPath)]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByIdUsingLiteralPath)]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByConsoleUsingLiteralPath)]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
     [ValidateNotNullOrEmpty]
-    // currently broken
     public string LiteralPath
     {
         get => _filePath;
@@ -133,8 +130,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     /// </summary>
     [Parameter(Position = 2)]
     public object[] ArgumentList { get; set; } = [];
-    
-    // public IDictionary Parameters { get; set; }
 
     protected override void BeginProcessing()
     {
@@ -230,24 +225,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             {
                 foreach (object arg in ArgumentList) ps.AddArgument(arg);
             }
-
-            // if (Parameters.Count > 0)
-            // {
-            //     foreach (DictionaryEntry entry in Parameters)
-            //     {
-            //         string name = (string)entry.Key;
-            //         object? value = entry.Value;
-            //
-            //         if (value is null or true)
-            //         {
-            //             ps.AddParameter(name);
-            //         }
-            //         else
-            //         {
-            //             ps.AddParameter(name, value);
-            //         }
-            //     }
-            // }
 
             ps.Invoke(null, output);
 
