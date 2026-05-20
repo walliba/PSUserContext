@@ -16,22 +16,17 @@ namespace PSUserContext.Cmdlets;
 
 [Cmdlet(VerbsLifecycle.Invoke, "UserContext", DefaultParameterSetName = "ByIdUsingScriptBlock",
     SupportsShouldProcess = true)]
-[OutputType(typeof(UserProcessResult))]
-[OutputType(typeof(UserProcessWithOutputResult))]
 public sealed class InvokeUserContextCommand : PSCmdlet
 {
     // TODO: fix poor ParameterSet strategy
     private const string ById                      = "ById";
     private const string ByConsole                 = "ByConsole";
     private const string UsingScriptBlock          = "UsingScriptBlock";
-    private const string UsingPath                 = "UsingPath";
-    private const string UsingLiteralPath          = "UsingLiteralPath";
+    private const string UsingFilePath                 = "UsingPath";
     private const string ByIdUsingScriptBlock      = ById + UsingScriptBlock;
-    private const string ByIdUsingPath             = ById + UsingPath;
-    private const string ByIdUsingLiteralPath      = ById + UsingLiteralPath;
+    private const string ByIdUsingFilePath             = ById + UsingFilePath;
     private const string ByConsoleUsingScriptBlock = ByConsole + UsingScriptBlock;
-    private const string ByConsoleUsingPath        = ByConsole + UsingPath;
-    private const string ByConsoleUsingLiteralPath = ByConsole + UsingLiteralPath;
+    private const string ByConsoleUsingFilePath        = ByConsole + UsingFilePath;
 
     private const string RequiredPrivilege     = "SeDelegateSessionUserImpersonatePrivilege";
     private const string WindowsPowershellPath = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
@@ -45,9 +40,6 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             $"\"{WindowsPowershellPath}\" -ExecutionPolicy RemoteSigned -NoLogo -NoProfile -WindowStyle Hidden -NamedPipeServerMode");
 
     private string _filePath = string.Empty;
-    // TODO: Determine if path expansion should be supported.
-    // The alternative is to just support a -FilePath parameter, like Invoke-Command, unless its beneficial to support wildcards?
-    private bool   _shouldExpandPath;
 
     private PropertyInfo? _preserveInvocationInfoOnce;
 
@@ -65,9 +57,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
         ParameterSetName = ByIdUsingScriptBlock)]
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
-        ParameterSetName = ByIdUsingPath)]
-    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true,
-        ParameterSetName = ByIdUsingLiteralPath)]
+        ParameterSetName = ByIdUsingFilePath)]
     [ValidateNotNullOrEmpty]
     public uint SessionId { get; set; } = uint.MaxValue;
 
@@ -79,8 +69,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     ///     <see cref="InvalidOperationException">InvalidOperationException</see>
     /// </remark>
     [Parameter(Mandatory = true, ParameterSetName = ByConsoleUsingScriptBlock)]
-    [Parameter(Mandatory = true, ParameterSetName = ByConsoleUsingPath)]
-    [Parameter(Mandatory = true, ParameterSetName = ByConsoleUsingLiteralPath)]
+    [Parameter(Mandatory = true, ParameterSetName = ByConsoleUsingFilePath)]
     public SwitchParameter Console { get; set; }
 
     [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByIdUsingScriptBlock)]
@@ -95,30 +84,15 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         }
     }
 
-    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByIdUsingPath)]
-    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByConsoleUsingPath)]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByIdUsingFilePath)]
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByConsoleUsingFilePath)]
     [ArgumentCompleter(typeof(ScriptFileCompleter))]
     [ValidateNotNullOrEmpty]
-    public string Path
+    public string FilePath
     {
         get => _filePath;
         set
         {
-            _shouldExpandPath = true;
-            _filePath = value;
-        }
-    }
-
-    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByIdUsingLiteralPath)]
-    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ByConsoleUsingLiteralPath)]
-    [ArgumentCompleter(typeof(ScriptFileCompleter))]
-    [ValidateNotNullOrEmpty]
-    public string LiteralPath
-    {
-        get => _filePath;
-        set
-        {
-            _shouldExpandPath = false;
             _filePath = value;
         }
     }
@@ -139,8 +113,14 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         if (_filePath != string.Empty)
         {
             // Read contents of file and put in _script
-            var file = GetFileInfoFromPsPath(_filePath, _shouldExpandPath);
+            var file = GetFileInfoFromPsPath(_filePath, false);
 
+            if (!file.Extension.ToLower().Equals(".ps1"))
+            {
+                throw new ArgumentException(
+                    "The value of the FilePath parameter must be a Windows PowerShell script file. Enter the path to a file with a .ps1 file name extension and try the command again.");
+            }
+            
             if (file.Exists) _script = File.ReadAllText(file.FullName, Encoding.UTF8);
         }
 
@@ -195,7 +175,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             {
                 var errors = (PSDataCollection<ErrorRecord>)sender;
                 var e = errors[args.Index];
-
+                
+                // Expose the underlying RemoteException error record
                 if (e is { Exception: RemoteException re })
                 {
                     e = re.ErrorRecord;
@@ -287,7 +268,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             // TODO: Add support for path expansion returning multiple files?
             return new FileInfo(filePath);
 
-        // This could be a permission issue
+        // This could be a permission issue or it simply doesn't exist
         throw new ItemNotFoundException($"The path '{filePath}' does not exist or is inaccessible.");
     }
 
@@ -311,22 +292,4 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         return isFileSystem;
     }
-}
-
-public class UserProcessResult
-{
-    public uint ProcessId { get; set; }
-    public uint SessionId { get; set; }
-    public uint ExitCode { get; set; }
-
-    public override string ToString()
-    {
-        return $"PID {ProcessId} (Session {SessionId}): exit code {ExitCode}";
-    }
-}
-
-public class UserProcessWithOutputResult : UserProcessResult
-{
-    public string StandardOutput { get; set; } = string.Empty;
-    public string StandardError { get; set; } = string.Empty;
 }
