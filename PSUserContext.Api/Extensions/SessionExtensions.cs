@@ -91,7 +91,7 @@ namespace PSUserContext.Api.Extensions
 						UserName = userName,
 						DomainName = domainName,
 						SessionName = sessionName,
-						State = (int)ppSessionInfo[i].State
+						State = (WtsSessionState)ppSessionInfo[i].State
 					});
 
 				}

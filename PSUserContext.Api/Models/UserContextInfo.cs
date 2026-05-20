@@ -9,7 +9,7 @@ namespace PSUserContext.Api.Models
 		public string? UserName { get; init; }
 		public required uint Id { get; init; }
 		public string? SessionName { get; init; }
-		public required int State { get; init; }
+		public required WtsSessionState State { get; init; }
 		
 		public static implicit operator uint(UserContextInfo sessionInfo)
 			=> sessionInfo.Id;
