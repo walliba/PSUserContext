@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
-using System.Management.Automation.Internal;
 using System.Management.Automation.Runspaces;
 using System.Reflection;
 using System.Text;
@@ -23,13 +21,11 @@ namespace PSUserContext.Cmdlets;
 public sealed class InvokeUserContextCommand : PSCmdlet
 {
     // TODO: fix poor ParameterSet strategy
-    private const string ById                                      = "ById";
-    private const string ByConsole                                 = "ByConsole";
-    private const string UsingScriptBlock                          = "UsingScriptBlock";
-    private const string UsingPath                                 = "UsingPath";
-    private const string UsingLiteralPath                          = "UsingLiteralPath";
-    private const string WithArgumentList                          = "WithArgumentList";
-    private const string WithParameters                            = "WithParameters";
+    private const string ById                      = "ById";
+    private const string ByConsole                 = "ByConsole";
+    private const string UsingScriptBlock          = "UsingScriptBlock";
+    private const string UsingPath                 = "UsingPath";
+    private const string UsingLiteralPath          = "UsingLiteralPath";
     private const string ByIdUsingScriptBlock      = ById + UsingScriptBlock;
     private const string ByIdUsingPath             = ById + UsingPath;
     private const string ByIdUsingLiteralPath      = ById + UsingLiteralPath;
@@ -37,12 +33,10 @@ public sealed class InvokeUserContextCommand : PSCmdlet
     private const string ByConsoleUsingPath        = ByConsole + UsingPath;
     private const string ByConsoleUsingLiteralPath = ByConsole + UsingLiteralPath;
 
-    private const string RequiredPrivilege = "SeDelegateSessionUserImpersonatePrivilege";
+    private const string RequiredPrivilege     = "SeDelegateSessionUserImpersonatePrivilege";
     private const string WindowsPowershellPath = @"C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe";
-    
-    private readonly ConcurrentQueue<(long seq, Action emit)> _queue = new();
 
-    private PropertyInfo? _preserveInvocationInfoOnce;
+    private readonly ConcurrentQueue<(long seq, Action emit)> _queue = new();
 
     // TODO: append -NonInteractive if the current host does not support interactivity.
     // https://github.com/PowerShell/PowerShell/blob/master/src/Microsoft.PowerShell.ConsoleHost/host/msh/ConsoleHost.cs
@@ -50,12 +44,17 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         new(
             $"\"{WindowsPowershellPath}\" -ExecutionPolicy RemoteSigned -NoLogo -NoProfile -WindowStyle Hidden -NamedPipeServerMode");
 
-    private long   _seq;
-    
+    private string _filePath = string.Empty;
+    // TODO: Determine if path expansion should be supported.
+    // The alternative is to just support a -FilePath parameter, like Invoke-Command, unless its beneficial to support wildcards?
+    private bool   _shouldExpandPath;
+
+    private PropertyInfo? _preserveInvocationInfoOnce;
+
     private string       _script = string.Empty;
     private ScriptBlock? _scriptBlock;
-    private bool         _shouldExpandPath;
-    private string       _filePath = string.Empty;
+
+    private long _seq;
 
     /// <summary>
     ///     The session ID of the user context to invoke.
@@ -171,7 +170,7 @@ public sealed class InvokeUserContextCommand : PSCmdlet
 
         // TODO: properly support ShouldProcess
         if (!ShouldProcess($"session {SessionId}",
-                $"executing {(MyInvocation.BoundParameters.ContainsKey("ScriptBlock") ? "scriptblock" : "file")}"))
+                $"executing {(MyInvocation.BoundParameters.ContainsKey("ScriptBlock") ? "scriptblock" : _filePath)}"))
             return;
 
         using var result = ProcessExtensions.CreateProcessAsUser(SessionId,
@@ -219,12 +218,17 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             ps.Runspace = runspace;
             ps.Runspace.Open();
 
+            var verbosePref = MyInvocation.BoundParameters.ContainsKey("Verbose")
+                ? ActionPreference.Continue
+                : ActionPreference.SilentlyContinue;
+
+            ps.Runspace.SessionStateProxy.SetVariable("VerbosePreference", verbosePref);
+
             ps.AddScript(_script);
 
             if (ArgumentList.Length > 0)
-            {
-                foreach (object arg in ArgumentList) ps.AddArgument(arg);
-            }
+                foreach (object arg in ArgumentList)
+                    ps.AddArgument(arg);
 
             ps.Invoke(null, output);
 
@@ -263,13 +267,13 @@ public sealed class InvokeUserContextCommand : PSCmdlet
         }
         catch (ItemNotFoundException e)
         {
-            throw new InvalidOperationException($"Path '{psPath}' does not exist.", e);
+            throw new ItemNotFoundException($"Path '{psPath}' does not exist.", e);
         }
 
         switch (filePaths.Count)
         {
             case 0:
-                throw new InvalidOperationException($"Path `{psPath}` does not exist.");
+                throw new ItemNotFoundException($"Path `{psPath}` does not exist.");
             case > 1:
                 throw new InvalidOperationException($"Path '{psPath}' expanded to multiple files.");
         }
@@ -280,10 +284,8 @@ public sealed class InvokeUserContextCommand : PSCmdlet
             throw new InvalidOperationException($"Path '{filePath}' is not a FileSystem path.");
 
         if (File.Exists(filePath))
-        {
             // TODO: Add support for path expansion returning multiple files?
             return new FileInfo(filePath);
-        }
 
         // This could be a permission issue
         throw new ItemNotFoundException($"The path '{filePath}' does not exist or is inaccessible.");
