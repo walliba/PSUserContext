@@ -8,12 +8,17 @@ A *user context* refers to a Windows terminal session — for example, the local
 
 This module provides fine-grained control over executing processes and scripts as specific users, making it useful for system administration, automation, and remote management scenarios.
 
+## Installation
+
+> [!NOTE]
+> This module **MUST** be ran as `NT AUTHORITY\SYSTEM` or from an account with the `SeDelegateSessionUserImpersonatePrivilege` privilege.
+> A typical scenario is running from an RMM tool which executes under SYSTEM, or by using PsExec.
+
+You can install this module directly with PowerShellGet from PSGallery:
+
+`Install-Module -Name PSUserContext`
 
 ## Use Case
-
-This module **MUST** be ran as `NT AUTHORITY\SYSTEM` or from an account with the `SeDelegateSessionUserImpersonatePrivilege` privilege.
-
-A typical scenario is running from an RMM tool which executes under SYSTEM, or by using PsExec.
 
 ### 1. Refreshing Group Policy in a User Session
 System or RMM tasks often run under the **SYSTEM** account and can’t directly interact with the logged-on user’s environment.  
